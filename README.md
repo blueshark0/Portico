@@ -1,175 +1,194 @@
+<div align="center">
+
 # Portico
 
-**English** | [中文](#中文)
+**One local control plane for Claude Code, Codex, and Gemini CLI providers.**
 
-A desktop app that centrally manages API providers for the [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [Codex](https://github.com/openai/codex), and [Gemini](https://github.com/google-gemini/gemini-cli) CLIs.
+Manage providers, route sessions, inspect usage and costs, and aggregate MCP servers — without changing how you use your CLI tools.
 
-- Switch providers for cc & codex **without restarting** them
-- Per-platform default provider with **session stickiness** — routing behavior is explicit and controllable
-- **Per-request usage & cost tracking** — always know what you spent
+[![CI](https://github.com/blueshark0/Portico/actions/workflows/test.yml/badge.svg)](https://github.com/blueshark0/Portico/actions/workflows/test.yml)
+[![Latest release](https://img.shields.io/github/v/release/blueshark0/Portico)](https://github.com/blueshark0/Portico/releases)
+[![Go 1.26+](https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go&logoColor=white)](go.mod)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Built with [Wails 3](https://v3.wails.io) (Go + Vue 3).
+[Download](https://github.com/blueshark0/Portico/releases) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Development](#development) · [中文文档](README.zh-CN.md)
 
-## How it works
+<img src="resources/images/portico.png" alt="Portico dashboard" width="900">
 
-On launch, Portico starts a local HTTP relay on `127.0.0.1:18100` and rewrites the Claude Code, Codex, and Gemini CLI configs to point at it. The relay exposes only the endpoints the CLIs need:
+</div>
 
-- `/v1/messages` → your configured Claude provider
-- `/responses` → your configured Codex provider
-- `/gemini/v1beta/*` and `/gemini/v1/*` → your configured Gemini provider (Gemini API format)
+## Highlights
 
-Each request is routed to the provider bound to its session; sessions without a binding go to the platform's default provider. If a bound provider is deleted, disabled, or no longer supports the requested model, Portico clears the stale binding and re-binds to the current default.
+- **Unified provider management** — configure API providers for Claude Code, Codex, and Gemini CLI in one desktop app.
+- **Session-aware routing** — each platform has a default provider, while active sessions remain bound to the provider that served them.
+- **Seamless switching** — change providers for Claude Code and Codex without restarting the CLI.
+- **Model controls** — restrict supported models and remap model names, including wildcard mappings such as `claude-*` → `anthropic/claude-*`.
+- **Usage and cost visibility** — inspect request logs, token usage, model pricing, costs, and session activity.
+- **MCP aggregation gateway** — combine tools from multiple stdio and remote MCP servers behind a single local `/mcp` endpoint.
+- **Network flexibility** — configure a proxy per provider, with an explicit opt-in for local TLS interception.
+- **Encrypted config sync** — synchronize configuration through WebDAV with encryption.
+- **Thoughtful desktop experience** — light/dark themes, English and Chinese interfaces, global hotkeys, and quick switching.
 
-To the CLIs, everything looks like one fixed local address — Portico transparently routes real requests to whichever providers you maintain in the app. It also includes a **MCP aggregation gateway** at `/mcp` that merges multiple upstream MCP servers into one endpoint for all three CLIs.
+Built with [Wails 3](https://v3.wails.io/), Go, Vue 3, and TypeScript.
 
 ## Download
 
-[macOS](https://github.com/blueshark0/Portico/releases) | [Windows](https://github.com/blueshark0/Portico/releases)
+Download the latest package for **macOS** or **Windows** from [GitHub Releases](https://github.com/blueshark0/Portico/releases).
 
-## Preview
+## Quick start
 
-![Dashboard (light)](resources/images/portico.png)
-![Dashboard (dark)](resources/images/portico-dark.png)
-![Providers](resources/images/portico-providers.png)
-![Usage logs (light)](resources/images/portico-logs.png)
-![Usage logs (dark)](resources/images/portico-logs-dark.png)
-![Sessions](resources/images/portico-sessions.png)
-![MCP servers](resources/images/portico-mcp.png)
+1. **Add a provider** on the Providers page: enter its endpoint, API key, and optional model rules.
+2. **Choose a default provider** for each CLI platform you use.
+3. **Enable platform access** on the dashboard. Portico updates only the managed fields in the corresponding CLI configuration and points it to the local relay.
+4. **Use your CLI normally.** Requests now pass through Portico, which applies provider routing and model mapping automatically.
+5. **Optional:** open the MCP page to add upstream servers and inject the aggregated MCP endpoint into Claude Code or Codex.
+
+To disconnect a CLI, disable its platform access in Portico. The original values of fields managed during that session are restored; unrelated CLI configuration is left untouched.
+
+## How it works
+
+Portico runs a local HTTP relay on `127.0.0.1:18100`. Once platform access is enabled, each CLI sends requests to this fixed local address instead of directly to a provider.
+
+```text
+Claude Code  ── /v1/messages ───────┐
+Codex        ── /responses ─────────┼──▶ Portico local relay ──▶ Configured provider
+Gemini CLI   ── /gemini/v1beta/* ───┘         │
+                                              ├─ Default provider selection
+                                              ├─ Session stickiness
+                                              ├─ Model validation and mapping
+                                              └─ Usage and cost logging
+
+MCP clients  ─────────────── /mcp ────────────▶ Aggregated upstream MCP tools
+```
+
+Routing uses a **default provider plus session stickiness**, not a fallback chain. A new session starts on the platform's default provider and stays with the provider that successfully served it. If that provider is deleted, disabled, or incompatible with the requested model, Portico clears the stale binding and uses the current default provider.
+
+The relay forwards request bodies and responses transparently, removes client credential headers, and injects the selected provider's credentials. Upstream errors are returned to the CLI unchanged.
+
+## More screenshots
+
+<details>
+<summary>Dashboard, providers, logs, sessions, and MCP</summary>
+<br>
+
+| Dark dashboard | Provider management |
+| --- | --- |
+| ![Dashboard in dark mode](resources/images/portico-dark.png) | ![Provider management](resources/images/portico-providers.png) |
+
+| Usage logs | Usage logs in dark mode |
+| --- | --- |
+| ![Usage logs](resources/images/portico-logs.png) | ![Usage logs in dark mode](resources/images/portico-logs-dark.png) |
+
+| Sessions | MCP servers |
+| --- | --- |
+| ![Session list](resources/images/portico-sessions.png) | ![MCP server management](resources/images/portico-mcp.png) |
+
+</details>
+
+## Local data and privacy
+
+Portico stores application state under `~/.portico/`:
+
+| Path | Contents |
+| --- | --- |
+| `app.db` | Providers, profiles, preferences, sync settings, and MCP servers |
+| `request_log.db` | Request usage and cost logs |
+| `session.db` | Session-to-provider bindings |
+| `hotkeys.db` | Global hotkey configuration |
+| `platformproxy/*.json` | Original values and state of managed CLI configuration fields |
+
+Provider API keys are stored in the local application database. The relay listens on loopback only and requires Portico's local placeholder token. Do not expose the relay to a public network.
 
 ## Development
 
-Prerequisites:
-- Go 1.26+
-- Node.js 18+ with pnpm
-- Wails 3.1.0 CLI: `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0`
-- Linux build deps: `libgtk-4-dev`, `libwebkitgtk-6.0-dev`
+### Prerequisites
+
+- Go **1.26+**
+- Node.js **18+** and [pnpm](https://pnpm.io/)
+- Wails **3.1.0** CLI:
+
+  ```bash
+  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
+  ```
+
+- On Linux: `libgtk-4-dev` and `libwebkitgtk-6.0-dev`
+
+### Run the desktop app
 
 ```bash
-wails3 task dev     # run with hot reload
-wails3 task build   # build for current platform
-go test -race -count=1 ./...
-```
-
-Browser-only frontend preview (no Go backend needed; serves demo data via a mock Wails transport):
-
-```bash
-cd frontend
-pnpm install
-pnpm dev            # http://localhost:9245
-```
-
-## Release
-
-`scripts/publish_release.sh v0.1.0` builds and uploads `portico-macos-arm64.zip`, `portico-macos-amd64.zip`, `portico-arm64-installer.exe`, and `portico.exe`. GitHub Actions also builds releases from `v*` tags (see `.github/workflows/release.yml`).
-
-## Model pricing source
-
-Model pricing data is derived from [BerriAI/litellm](https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json).
-
----
-
-# 中文
-
-集中管理 Claude Code、Codex 与 Gemini 供应商的桌面应用。
-
-- 无需重启 cc & codex, 平滑切换不同供应商
-- 支持按平台维护默认供应商与会话绑定, 路由行为清晰可控
-- 支持请求级别的用量统计, 花费多少清晰可见
-
-基于 [Wails 3](https://v3.wails.io)
-
-## 实现原理
-
-应用启动时会初始化 在本地 18100 端口创建一个 HTTP 代理服务器, 默认绑定 :18100
-
-并自动更新 Claude Code、Codex 配置, 指向 http://127.0.0.1:18100 服务
-
-代理内部只暴露兼容的关键端点：
-
-- /v1/messages 转发到配置的 Claude 供应商
-- /responses 转发到 Codex 供应商；
-- /gemini/v1beta/* 以及 /gemini/v1/* 以 Gemini API 格式转发到配置的 Gemini 供应商
-
-请求会优先命中当前会话已绑定的 provider；如果没有会话绑定，则转发到该平台的默认 provider。
-当已绑定 provider 已被删除、禁用或与当前请求不兼容时，Portico 会自动清理这条失效绑定，并回退到当前默认 provider 重新建立绑定。
-
-以上流程让 cli 看到的是一个固定的本地地址，而真实请求会被 Portico 透明地路由到你在应用里维护的供应商列表。此外还内置 MCP 聚合网关（`/mcp`），把多个上游 MCP server 合并成一个端点供三个 CLI 共用。
-
-## 下载
-
-[macOS](https://github.com/blueshark0/Portico/releases) | [windows](https://github.com/blueshark0/Portico/releases)
-
-## 预览
-![亮色主界面](resources/images/portico.png)
-![暗色主界面](resources/images/portico-dark.png)
-![供应商管理](resources/images/portico-providers.png)
-![用量日志亮色](resources/images/portico-logs.png)
-![用量日志暗色](resources/images/portico-logs-dark.png)
-![会话列表](resources/images/portico-sessions.png)
-![MCP 服务](resources/images/portico-mcp.png)
-
-## 开发准备
-- Go 1.26+
-- Node.js 18+
-- npm / pnpm / yarn
-- Wails 3.1.0 CLI：`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0`
-- Linux 构建依赖：`libgtk-4-dev`、`libwebkitgtk-6.0-dev`
-
-## 开发运行
-```bash
+git clone https://github.com/blueshark0/Portico.git
+cd Portico
 wails3 task dev
 ```
 
-纯浏览器预览前端（无需 Go 后端，内置演示数据，通过 mock Wails transport 提供）：
+The development server supports hot reload.
+
+### Preview the frontend in a browser
+
+No Go backend is required; a mock Wails transport supplies demo data.
+
 ```bash
 cd frontend
 pnpm install
-pnpm dev            # http://localhost:9245
+pnpm dev
 ```
 
-## 构建流程
-1. 同步 build metadata：
-   ```bash
-   wails3 task common:update:build-assets
-   ```
-2. 打包 macOS `.app`：
-   ```bash
-   wails3 task package
-   ```
+Open `http://localhost:9245`.
 
-### 交叉编译 Windows (macOS 环境)
-1. 安装 `mingw-w64`：
-   ```bash
-   brew install mingw-w64
-   ```
-2. 运行 Windows 任务：
-   ```bash
-   env ARCH=amd64 wails3 task windows:build
-   # 生成安装器
-   env ARCH=amd64 wails3 task windows:package
-   ```
+### Checks
 
-## 发布
-脚本 `scripts/publish_release.sh v0.1.0` 将自动打包并上传以下资产（macOS 会分别构建 arm64 与 amd64）：
-- `portico-macos-arm64.zip`
-- `portico-macos-amd64.zip`
-- `portico-arm64-installer.exe`
-- `portico.exe`
+Run the same core checks used by CI before submitting changes:
 
-若要手动发布，可执行：
 ```bash
-wails3 task package
-env ARCH=amd64 wails3 task windows:package
-scripts/publish_release.sh
+go vet ./...
+go test -race -count=1 ./...
+
+cd frontend
+pnpm install
+pnpm run build
 ```
 
-## 常见问题
-- 若 `.app` 无法打开，先执行 `wails3 task common:update:build-assets` 后再构建。
-- macOS 交叉编译需要终端拥有完全磁盘访问权限，否则 `~/Library/Caches/go-build` 会报 *operation not permitted*。
+### Build and package
 
-## 模型价格参考源
-//URL Source: http://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json
+```bash
+wails3 task common:update:build-assets  # refresh build metadata
+wails3 task build                       # build for the current platform
+wails3 task package                     # create a production package
+```
+
+To publish a tagged release, use `scripts/publish_release.sh v0.1.0`. GitHub Actions also builds release assets from `v*` tags; see [`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+## Project structure
+
+```text
+internal/
+  app/                 Composition root and desktop shell
+  interfaces/          HTTP relay and Wails facades
+  routing/             Providers, route profiles, and model mapping
+  sessions/            Session-to-provider stickiness
+  observability/       Request logs, token parsing, and statistics
+  mcpgateway/          MCP aggregation and upstream connections
+  platformproxy/       Surgical CLI configuration updates
+  configsync/          Encrypted WebDAV synchronization
+  shared/              Storage, logging, and background workers
+frontend/              Vue 3 + TypeScript desktop interface
+resources/             Images and model-pricing data
+```
+
+See [CLAUDE.md](CLAUDE.md) for architecture details and development invariants.
+
+## Contributing
+
+Issues and pull requests are welcome. Keep changes focused, include tests for behavioral changes, run the checks above, and update both English and Chinese locale files when changing UI text.
+
+Please report security vulnerabilities privately using the process in [SECURITY.md](SECURITY.md), rather than opening a public issue.
+
+## Acknowledgments
+
+- Desktop application framework: [Wails](https://wails.io/)
+- MCP support: [Model Context Protocol Go SDK](https://github.com/modelcontextprotocol/go-sdk)
+- Model pricing data: [BerriAI/litellm](https://github.com/BerriAI/litellm)
 
 ## License
 
-[Apache 2.0](LICENSE)
+Portico is licensed under the [Apache License 2.0](LICENSE).
