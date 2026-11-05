@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Portico
+Comment=Manage Claude & Codex relays, providers, and request logs.
+Exec=/usr/local/bin/Portico %u
+Terminal=false
+Icon=Portico
+Categories=Utility;
+StartupWMClass=Portico

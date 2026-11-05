@@ -1,0 +1,42 @@
+version: '3'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+
+vars:
+  APP_NAME: "Portico"
+  BIN_DIR: "bin"
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+
+env:
+  HTTP_PROXY: "http://127.0.0.1:9890"
+  HTTPS_PROXY: "http://127.0.0.1:9890"
+  http_proxy: "http://127.0.0.1:9890"
+  https_proxy: "http://127.0.0.1:9890"
+  NO_PROXY: "localhost,127.0.0.1"
+  no_proxy: "localhost,127.0.0.1"
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: "{{OS}}:build"
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: "{{OS}}:package"
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: "{{OS}}:run"
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+

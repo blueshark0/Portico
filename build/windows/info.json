@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "1.0.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "1.0.0",
+			"CompanyName": "Portico",
+			"FileDescription": "Manage Claude & Codex relays, providers, and request logs.",
+			"LegalCopyright": "(c) 2025, Portico",
+			"ProductName": "Portico",
+			"Comments": "Portico desktop relay controller"
+		}
+	}
+}

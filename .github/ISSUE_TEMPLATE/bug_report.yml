@@ -1,0 +1,46 @@
+name: Bug Report
+description: Report a reproducible problem
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check [Common Debugging](https://github.com/blueshark0/Portico#development) first — relay 401s usually mean the platform proxy needs re-enabling.
+  - type: input
+    id: version
+    attributes:
+      label: Portico version / commit
+      placeholder: e.g. v0.1.0 or commit sha
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Affected CLI
+      options:
+        - Claude Code
+        - Codex
+        - Gemini
+        - MCP gateway
+        - Not CLI-specific
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / error output
+      description: Set PORTICO_DEBUG_RELAY=1 for verbose relay logs. Redact API keys before pasting.
+      render: shell
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: OS, CLI version

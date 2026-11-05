@@ -1,0 +1,1040 @@
+{
+  "app": {
+    "title": "My App",
+    "login": "Login"
+  },
+  "menus": {
+    "about": "About",
+    "general": "General settings",
+    "shortcut": "Shortcut key"
+  },
+  "components": {
+    "common": {
+      "close": "Close"
+    },
+    "provider": {
+      "modelWhitelist": {
+        "label": "Supported Models",
+        "tooltip": "Declare which models this provider supports. Supports exact match (claude-sonnet-4) and wildcard (claude-*)",
+        "placeholder": "e.g., claude-*",
+        "add": "Add",
+        "remove": "Remove model",
+        "examples": {
+          "title": "Examples:",
+          "exact": "Exact match",
+          "prefix": "Prefix match all Claude models",
+          "vendor": "Match models with vendor prefix"
+        }
+      },
+      "modelMapping": {
+        "label": "Model Mapping",
+        "tooltip": "Map external model names to provider-specific names. Supports wildcard expansion",
+        "keyPlaceholder": "External model (e.g., claude-*)",
+        "valuePlaceholder": "Internal model (e.g., anthropic/claude-*)",
+        "add": "Add",
+        "remove": "Remove mapping",
+        "edit": "Edit mapping",
+        "confirm": "Save",
+        "cancel": "Cancel",
+        "examples": {
+          "title": "Examples:",
+          "exact": "Exact mapping",
+          "wildcard": "Wildcard mapping, auto expands claude-sonnet-4 → anthropic/claude-sonnet-4",
+          "prefix": "Prefix mapping"
+        }
+      },
+      "requestBodyReplacements": {
+        "overrideLabel": "Request Body Overrides",
+        "overrideTooltip": "Rewrite the field to the target value regardless of its current value. Missing paths are skipped.",
+        "replaceLabel": "Request Body Replace",
+        "replaceTooltip": "Rewrite the field only when its current value equals the match value. Missing paths are skipped.",
+        "pathPlaceholder": "JSON path, e.g. metadata.user_id",
+        "matchValuePlaceholder": "Match value (JSON), e.g. \"old-value\", 0.2",
+        "valuePlaceholder": "JSON value, e.g. \"fixed-user\", 0.2, true, null, {'{\"x\":1}'}",
+        "add": "Add",
+        "remove": "Remove rule",
+        "overrideExamples": {
+          "title": "Examples:",
+          "string": "Override an existing string field",
+          "number": "Write a numeric JSON value",
+          "object": "Write an object JSON value"
+        },
+        "replaceExamples": {
+          "title": "Examples:",
+          "hint": "Rewrite only when the current value equals the match value",
+          "string": "Swap the model when it equals the given value"
+        }
+      }
+    },
+    "themesetting": {
+      "select": {
+        "opt_system": "Follow system",
+        "opt_dark": "Dark Mode",
+        "opt_light": "Bright Mode"
+      }
+    },
+    "general": {
+      "title": {
+        "application": "Apply settings",
+        "network": "Network",
+        "exterior": "Appearance settings",
+        "power": "Permission settings",
+        "update": "Application update",
+        "sync": "Config sync (WebDAV)"
+      },
+      "label": {
+        "assistant_access": "Accessibility permissions",
+        "automatic_up": "Automatically check for updates",
+        "disk_access": "Full disk access",
+        "language": "Interface language",
+        "next_up": "Automatically check for updates next time",
+        "startup": "Started when logged in",
+        "theme": "Theme mode",
+        "heatmap": "Show dashboard heatmap",
+        "homeTitle": "Show home title",
+        "proxy": "HTTP Proxy"
+      },
+      "sublabel": {
+        "sb_assistant_access": "Accessibility permission is required to operate clipboard contents",
+        "sb_disk_access": "Full disk access is required to implement file preview"
+      },
+      "placeholder": {
+        "proxy": "e.g. http://127.0.0.1:7890"
+      },
+      "buttons": {
+        "authorized": "Auth",
+        "go_authorized": "Auth now",
+        "back": "Back to home",
+        "save": "Save"
+      },
+      "messages": {
+        "loadFailed": "Failed to load settings",
+        "saveFailed": "Failed to save settings, please try again.",
+        "invalidProxyUrl": "Proxy URL must start with http://, https://, socks5://, or socks5h://"
+      },
+      "sync": {
+        "hint": "Sync provider configuration and appearance preferences to a WebDAV server. Data is end-to-end encrypted with your sync passphrase before upload.",
+        "fields": {
+          "endpoint": "WebDAV server URL",
+          "username": "Username",
+          "remotePath": "Remote path",
+          "appPassword": "WebDAV / app password",
+          "syncPassphrase": "Sync passphrase (encryption)"
+        },
+        "actions": {
+          "save": "Save",
+          "saving": "Saving…",
+          "test": "Test connection",
+          "testing": "Testing…",
+          "viewMeta": "View remote snapshot",
+          "loadingMeta": "Fetching…",
+          "upload": "Upload to cloud",
+          "uploading": "Uploading…",
+          "restore": "Restore from cloud",
+          "restoring": "Restoring…",
+          "show": "Show",
+          "hide": "Hide"
+        },
+        "meta": {
+          "title": "Remote snapshot",
+          "summary": "{updatedAt} · {deviceName} · {appVersion}",
+          "empty": "Not queried yet, or remote has no snapshot.",
+          "unknown": "Unknown"
+        },
+        "messages": {
+          "loadFailed": "Failed to load sync settings",
+          "saveSuccess": "Sync settings saved",
+          "saveFailed": "Failed to save sync settings",
+          "saveBeforeAction": "Please save your settings before running this action",
+          "connectionSuccess": "WebDAV connection succeeded",
+          "connectionFailed": "WebDAV connection failed",
+          "remoteEmpty": "No configuration snapshot on the remote yet",
+          "inspectFailed": "Failed to fetch remote snapshot",
+          "uploadSuccess": "Uploaded to cloud",
+          "uploadFailed": "Failed to upload to cloud",
+          "restoreConfirm": "Overwrite local configuration with the cloud snapshot? A local rollback snapshot will be created automatically.",
+          "restoreSuccess": "Restored from cloud. Rollback snapshot: {rollback}",
+          "restoreFailed": "Failed to restore from cloud",
+          "restoreFailedWithRollback": "Failed to restore from cloud. Rollback snapshot saved: {rollback}"
+        }
+      }
+    },
+    "mcp": {
+      "hero": {
+        "eyebrow": "MCP GATEWAY",
+        "title": "MCP Servers",
+        "lead": "Aggregate multiple MCP servers behind one local endpoint; once injected, Claude Code / Codex discover all tools automatically."
+      },
+      "actions": {
+        "back": "Back to home",
+        "refresh": "Refresh"
+      },
+      "cli": {
+        "title": "CLI Access",
+        "endpoint": "Endpoint",
+        "copy": "Copy",
+        "inject": "Inject",
+        "remove": "Remove",
+        "injected": "Injected",
+        "notInjected": "Not injected",
+        "helpTitle": "Notes & manual setup",
+        "helpRestart": "Restart the CLI (or /mcp reconnect in Claude Code) after injection for it to take effect.",
+        "helpRefresh": "When servers change at runtime: Claude Code refreshes tools automatically; Codex needs a restart.",
+        "helpContext": "With model traffic routed through this gateway, Claude Code loads full tool schemas upfront — keep the tool set small.",
+        "helpCodexBackend": "Codex MCP tools only work when routed to an OpenAI/Azure-compatible upstream.",
+        "manualTitle": "Manual setup (equivalent commands)"
+      },
+      "servers": {
+        "title": "MCP Servers",
+        "totalTools": "{count} tools",
+        "add": "Add server",
+        "empty": "No MCP servers yet — add one from the top right",
+        "toolCount": "{count} tools",
+        "toggle": "Enable/disable",
+        "edit": "Edit",
+        "delete": "Delete"
+      },
+      "status": {
+        "connected": "Connected",
+        "connecting": "Connecting",
+        "failed": "Failed",
+        "disabled": "Disabled"
+      },
+      "form": {
+        "titleNew": "Add MCP Server",
+        "titleEdit": "Edit MCP Server",
+        "name": "Name (tool namespace prefix)",
+        "namePlaceholder": "Start with a letter or digit; may contain - and _, e.g. github",
+        "type": "Type",
+        "typeStdio": "stdio (local process)",
+        "typeHttp": "HTTP (remote server)",
+        "command": "Command",
+        "args": "Args (space-separated)",
+        "argsPlaceholder": "-y {'@'}modelcontextprotocol/server-filesystem /tmp",
+        "env": "Environment variables (KEY=VALUE per line)",
+        "url": "Server URL",
+        "headers": "Headers (KEY=VALUE per line)",
+        "kvPlaceholder": "KEY=VALUE\nANOTHER=...",
+        "timeout": "Call timeout (seconds)",
+        "test": "Test connection",
+        "testing": "Testing...",
+        "testOk": "Connected, {count} tools discovered ({ms}ms)",
+        "testErr": "Connection failed: {error}",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saving": "Saving...",
+        "errors": {
+          "name": "Name must start with a letter or digit, contain only letters, digits, - and _ (no consecutive __), max 32 chars",
+          "command": "stdio type requires a command",
+          "url": "HTTP type requires a URL"
+        },
+        "subtitleStdio": "stdio runs a local command-line process",
+        "subtitleHttp": "Configure a remote HTTP endpoint with optional auth",
+        "auth": "Authentication",
+        "authNone": "None",
+        "authCustom": "Custom headers",
+        "token": "Access token",
+        "argsHint": "Arguments are passed in order; do not paste a whole shell line.",
+        "saveAndTest": "Save & test"
+      },
+      "confirm": {
+        "title": "Delete MCP server",
+        "body": "Delete \"{name}\"? Its tools will be removed from the gateway immediately.",
+        "delete": "Delete"
+      },
+      "messages": {
+        "loadFailed": "Failed to load MCP config",
+        "statusLoadFailed": "Failed to refresh statuses",
+        "saved": "Saved",
+        "saveFailed": "Save failed",
+        "deleted": "Deleted",
+        "deleteFailed": "Delete failed",
+        "toggleFailed": "Failed to toggle enabled state",
+        "testFailed": "Connection test failed",
+        "injected": "Injected — restart the CLI to take effect",
+        "injectionRemoved": "Injection removed",
+        "injectionFailed": "Injection operation failed",
+        "copied": "Endpoint copied",
+        "copyFailed": "Copy failed"
+      }
+    },
+    "logs": {
+      "filters": {
+        "platform": "Platform",
+        "allPlatforms": "All platforms",
+        "provider": "Provider",
+        "allProviders": "All providers",
+        "range": "Range",
+        "costTier": "Cost tier",
+        "allCostTiers": "All costs",
+        "httpStatus": "HTTP status",
+        "allHttpStatus": "All statuses",
+        "httpStatus200": "200 only",
+        "costTiers": {
+          "low": "Low cost",
+          "medium": "Medium cost",
+          "high": "High cost"
+        },
+        "ranges": {
+          "today": "Today",
+          "last3days": "Last 3 days",
+          "last7days": "Last 7 days"
+        },
+        "providerPlaceholder": "Provider name",
+        "limit": "Limit"
+      }
+    }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "save": "Save",
+    "saving": "Saving…",
+    "deleting": "Deleting…",
+    "loading": "Loading…"
+  },
+  "shell": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "providers": "Providers",
+      "providerArchive": "Archive management",
+      "logs": "Logs",
+      "sessions": "Sessions",
+      "mcp": "MCP Servers",
+      "mcpDiagnostics": "Diagnostics",
+      "settings": "Settings"
+    }
+  },
+  "quickSwitch": {
+    "title": "Switch Provider",
+    "subtitle": "Only affects the selected CLI client",
+    "currentClient": "Current client",
+    "currentPrefix": "Current: ",
+    "noCurrent": "Not set",
+    "searchPlaceholder": "⌕  Search provider name, model or endpoint…",
+    "available": "Available",
+    "empty": "No matching providers",
+    "currentActive": "Active",
+    "hintSelect": "Select",
+    "hintApply": "Apply",
+    "hintClose": "Close",
+    "advanced": "Advanced ↗",
+    "apply": "Apply",
+    "applied": "Switched {platform} to \"{name}\"",
+    "applyFailed": "Failed to apply"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Your AI coding environment, all set.",
+    "quickSwitch": {
+      "label": "Quick-switch the current CLI provider",
+      "hint": "Pick a client, search a profile, press Enter to apply",
+      "open": "Open switch panel"
+    },
+    "clients": {
+      "title": "Your coding clients",
+      "subtitle": "Each client manages its own configuration independently.",
+      "applied": "Applied",
+      "notApplied": "Not managed",
+      "currentProvider": "Current provider",
+      "none": "Not set",
+      "switch": "Switch",
+      "relay": "Managed by Portico",
+      "toggleFailed": "Failed to toggle integration"
+    },
+    "frequent": {
+      "title": "Frequent profiles"
+    },
+    "recent": {
+      "empty": "No recent sessions yet",
+      "todayAt": "Today {time}"
+    },
+    "local": {
+      "title": "Local service",
+      "healthy": "Healthy",
+      "degraded": "Degraded",
+      "idle": "Idle",
+      "endpoint": "MCP aggregation endpoint",
+      "copy": "Copy endpoint",
+      "mcpServices": "MCP servers",
+      "summary": "{servers} servers · {tools} tools",
+      "manage": "Manage MCP servers"
+    }
+  },
+  "providersPage": {
+    "title": "Providers",
+    "subtitle": "Manage endpoints, models and credentials; each CLI uses its own.",
+    "actions": {
+      "copyAcross": "Copy across CLIs",
+      "archiveManagement": "Archive management",
+      "back": "Back to providers",
+      "create": "Add provider",
+      "edit": "Edit",
+      "test": "Test connection",
+      "testing": "Testing…",
+      "restore": "Restore provider",
+      "restoring": "Restoring…",
+      "setCurrent": "Set as current",
+      "current": "Active"
+    },
+    "filters": {
+      "all": "All",
+      "count": "{count} profiles"
+    },
+    "list": {
+      "title": "Configured providers",
+      "subtitle": "Name, client scope and current usage status",
+      "empty": "No providers yet. Add one from the top right."
+    },
+    "status": {
+      "active": "Active",
+      "verified": "Verified",
+      "failed": "Failed",
+      "unverified": "Unverified",
+      "archived": "Archived"
+    },
+    "detail": {
+      "title": "Current profile details",
+      "baseUrl": "API BASE URL",
+      "apiKey": "API Key · local plaintext",
+      "copy": "Copy",
+      "lastTest": "Last verified",
+      "neverTested": "Never tested",
+      "testOk": "Connected · {ms} ms · today {time}",
+      "testErr": "Failed · {error} · today {time}",
+      "privacyNote": "Keys are shown in plaintext locally; mind your screen before sharing."
+    },
+    "menu": {
+      "open": "Provider actions",
+      "edit": "Edit",
+      "advanced": "Advanced",
+      "copyAcross": "Copy across CLIs",
+      "archive": "Archive provider",
+      "restore": "Restore",
+      "delete": "Delete"
+    },
+    "archiveConfirm": {
+      "title": "Archive provider?",
+      "subtitle": "You can restore it at any time; its configuration is not deleted",
+      "warningTitle": "This provider will be hidden from selection lists",
+      "warningBody": "The current default provider will not be changed automatically, and all configuration will be preserved.",
+      "target": "Provider: {name}",
+      "confirm": "Archive provider",
+      "confirming": "Archiving…"
+    },
+    "archivedPage": {
+      "title": "Archived providers",
+      "subtitle": "Archived providers are hidden from selection lists; restore them to make them selectable again.",
+      "all": "All archived",
+      "count": "{count} archived",
+      "listTitle": "Archived providers",
+      "listSubtitle": "Archive time, client scope and restore actions",
+      "empty": "No archived providers",
+      "detailTitle": "Archive details",
+      "archivedAt": "Archived at",
+      "unknownTime": "Not recorded",
+      "archivedOn": "Archived {date}",
+      "archivedOnUnknown": "Archive time not recorded",
+      "rulesTitle": "Restore rules",
+      "rulesBody": "Restoring returns the provider to selection lists without switching the current provider. API keys, model mappings and advanced configuration are preserved.",
+      "restoreNote": "Restoring makes this provider selectable again without applying it to a CLI.",
+      "delete": "Delete provider"
+    },
+    "editor": {
+      "titleNew": "Add provider",
+      "titleEdit": "Edit provider",
+      "subtitle": "Keys are shown in plaintext locally; copy and edit freely",
+      "name": "Profile name",
+      "namePlaceholder": "e.g. Anthropic Official",
+      "nameLocked": "The name of an existing provider cannot be changed (stable identifier).",
+      "platform": "Service type",
+      "apiUrl": "API Base URL",
+      "officialSite": "Official site (optional)",
+      "apiKey": "API Key · local plaintext",
+      "keyHint": "The key is shown locally in plaintext; you can copy and edit it.",
+      "copyKey": "Copy key",
+      "save": "Save"
+    },
+    "advanced": {
+      "title": "Advanced",
+      "subtitle": "Proxy mode, TLS and model control; rules apply in order",
+      "tabConnection": "Connection & models",
+      "tabBody": "Body rewrite",
+      "proxyMode": "Proxy mode",
+      "proxyInherit": "Inherit global",
+      "proxyCustom": "Custom proxy",
+      "proxyDirect": "Direct",
+      "proxyUrl": "Proxy URL",
+      "skipTls": "Skip TLS verification (insecure)",
+      "skipTlsHint": "For local intercepting proxies only; upstream certificates are no longer verified.",
+      "scopeHint": "Advanced settings only apply to this provider.",
+      "save": "Save"
+    },
+    "delete": {
+      "title": "Confirm deletion",
+      "subtitle": "Deleted providers cannot be restored directly",
+      "warningTitle": "This action cannot be undone directly.",
+      "warningBody": "Clients currently using it will not switch automatically.",
+      "target": "Provider: {name}",
+      "confirm": "Delete"
+    },
+    "copy": {
+      "title": "Copy across CLIs",
+      "subtitle": "Generate a draft for the target CLI from an existing profile; the source stays untouched",
+      "sourceReadonly": "Source read-only",
+      "newDraft": "New target draft",
+      "pending": "Pending",
+      "swap": "Switch target",
+      "rulesTitle": "Fill rules",
+      "rulesHint": "Common fields are filled automatically; protocol-specific config is marked for review.",
+      "colField": "Field",
+      "colAction": "Handling",
+      "colStatus": "Status after copy",
+      "rules": {
+        "baseUrl": {
+          "field": "API Base URL",
+          "action": "Filled into draft",
+          "status": "Confirm target protocol"
+        },
+        "apiKey": {
+          "field": "API Key",
+          "action": "Credential copied",
+          "status": "Only if target is compatible"
+        },
+        "model": {
+          "field": "Default model",
+          "action": "Filled, editable",
+          "status": "Check target model name"
+        },
+        "headers": {
+          "field": "Custom headers",
+          "action": "Recognized common items copied",
+          "status": "Protocol-specific skipped"
+        },
+        "proxy": {
+          "field": "Proxy / TLS",
+          "action": "Common network settings copied",
+          "status": "Review TLS risk"
+        },
+        "whitelist": {
+          "field": "Model whitelist / mapping",
+          "action": "Draft generated for target type",
+          "status": "Review item by item"
+        }
+      },
+      "warnTitle": "Claude Messages and Codex Responses protocols are not inherently compatible.",
+      "warnBody": "If the upstream is a compatibility gateway, confirm the target endpoint supports the protocol; test the connection after generating the draft.",
+      "note": "Direction can be switched; the source is always kept.",
+      "confirm": "Generate draft"
+    },
+    "messages": {
+      "loadFailed": "Failed to load providers",
+      "saveFailed": "Save failed",
+      "saved": "Saved",
+      "deleted": "Deleted",
+      "deleteFailed": "Delete failed",
+      "applied": "\"{name}\" is now active",
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+      "testFailed": "Connection test failed",
+      "archived": "\"{name}\" archived",
+      "restored": "\"{name}\" restored",
+      "archiveBlockedBecauseDefault": "The default provider cannot be archived; switch the default first"
+    },
+    "form": {
+      "errors": {
+        "nameRequired": "Please enter a profile name",
+        "duplicateName": "A profile with the same name exists",
+        "invalidUrl": "Please enter a valid http(s) URL",
+        "proxyUrlRequired": "Proxy URL is required in custom proxy mode",
+        "invalidProxyUrl": "Proxy URL must start with http://, https://, socks5:// or socks5h://"
+      }
+    }
+  },
+  "logsPage": {
+    "title": "Usage logs",
+    "subtitle": {
+      "overview": "Analyze today's cost, request quality and Token usage; open request logs for details.",
+      "requests": "Inspect cost, Tokens, first response and total duration for each request, then trace its session.",
+      "app": "Inspect service startup, MCP connections, upstream errors and internal application events."
+    },
+    "tabs": {
+      "overview": "Overview",
+      "requests": "Request logs",
+      "app": "Application logs",
+      "hint": "Analyze overall usage  ·  Inspect each request  ·  Diagnose runtime issues"
+    },
+    "appLog": {
+      "levelLabel": "Level",
+      "levels": {
+        "all": "All levels",
+        "none": "No level"
+      },
+      "keywordPlaceholder": "⌕  Search messages, source files or keywords…",
+      "follow": "Auto-follow",
+      "refresh": "Refresh",
+      "empty": "No application logs match the current filters",
+      "loading": "Reading logs…",
+      "truncatedHint": "The log file is large; only the latest portion is shown"
+    },
+    "overview": {
+      "loadFailed": "Failed to load usage statistics; please try again later",
+      "rangeLabel": "Statistics range",
+      "todayOption": "Today · {date}",
+      "metricsTitle": "Key metrics · {range}",
+      "metrics": {
+        "cost": "Request cost · {range}",
+        "costHint": "USD · estimated cost",
+        "requests": "Requests",
+        "requestsHint": "{range} total",
+        "successRate": "Success rate",
+        "successHint": "{count} failed requests",
+        "duration": "Avg total duration",
+        "durationHint": "Average across all requests"
+      },
+      "tokens": {
+        "title": "Token usage",
+        "subtitle": "Cache reads may count as input; reasoning Tokens may count as output",
+        "cacheHits": "{count} cache-hit requests",
+        "total": "Total Tokens",
+        "input": "Input Tokens",
+        "output": "Output Tokens",
+        "reasoning": "Reasoning Tokens",
+        "cacheRead": "Cache read",
+        "cacheCreate": "Cache write"
+      },
+      "trend": {
+        "title": "Usage trend",
+        "subtitle": "Last 7 days · Showing {metric} ({unit})",
+        "metricLabel": "Trend metric",
+        "chartLabel": "Seven-day {metric} trend",
+        "table": "Data table",
+        "tableCaption": "Seven-day {metric} data",
+        "day": "Day",
+        "empty": "No trend data in this range",
+        "metrics": {
+          "cost": "Cost",
+          "input": "Input",
+          "output": "Output",
+          "cacheCreate": "Cache write",
+          "reasoning": "Reasoning",
+          "cacheRead": "Cache read"
+        }
+      },
+      "note": "Cost and Tokens use independent units. Total Tokens = input + output; cache and reasoning may already be included."
+    },
+    "recent": {
+      "title": "Detailed request logs",
+      "subtitle": "Input / output and cache read / write Tokens appear on two lines",
+      "tokenHint": "Input / output and cache read / write use two rows; reasoning Tokens may already be included in output."
+    },
+    "filteredSummary": {
+      "title": "Filtered results",
+      "subtitle": "Totals across all matching records",
+      "cost": "Total cost",
+      "requests": "Requests",
+      "totalTokens": "Total Tokens",
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "cacheRead": "Cache read",
+      "cacheCreate": "Cache write",
+      "reasoning": "Reasoning Tokens"
+    },
+    "columns": {
+      "time": "Time",
+      "client": "Client",
+      "provider": "Provider",
+      "model": "Model",
+      "tokens": "Token usage",
+      "cost": "Cost",
+      "ttft": "First response",
+      "ttftHint": "Time to the first data event or JSON body; unavailable for historical entries",
+      "duration": "Duration",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "filters": {
+      "platform": "Client",
+      "provider": "Provider",
+      "status": "Request status",
+      "range": "Time range",
+      "pageSize": "Rows per page",
+      "allPlatforms": "Client: all",
+      "allProviders": "Provider: all",
+      "allStatus": "Status: all",
+      "successStatus": "Status: success",
+      "failedStatus": "Status: failed",
+      "rangeOption": "Time: {range}",
+      "pageSizeOption": "{count} rows / page",
+      "costTier": "Request cost range",
+      "costHint": "Low / medium / high are based on per-request cost · thresholds are defined by the backend",
+      "costTiers": {
+        "all": "All",
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High"
+      },
+      "ranges": {
+        "today": "Today",
+        "last3days": "Last 3 days",
+        "last7days": "Last 7 days"
+      }
+    },
+    "actions": {
+      "export": "Export records",
+      "exporting": "Exporting…",
+      "refresh": "Refresh",
+      "trace": "Trace session",
+      "traceTitle": "Open the complete session",
+      "traceUnavailable": "This request has no session ID"
+    },
+    "tokens": {
+      "inputShort": "In",
+      "outputShort": "Out",
+      "cacheReadShort": "Cache R",
+      "cacheWriteShort": "W"
+    },
+    "loading": "Loading request records…",
+    "empty": "No requests under current filters",
+    "status": {
+      "success": "Success",
+      "failure": "Failed"
+    },
+    "pager": {
+      "total": "{total} entries",
+      "range": "Showing {start}–{end} · {total} entries",
+      "current": "Page {page} / {total}",
+      "prev": "Previous",
+      "next": "Next"
+    },
+    "messages": {
+      "exported": "Exported {count} entries",
+      "exportFailed": "Export failed"
+    }
+  },
+  "sessionTrace": {
+    "title": "Session trace",
+    "subtitle": "Usage logs  /  Request logs  /  Session trace",
+    "back": "Back to request logs",
+    "loading": "Loading session requests…",
+    "loadFailed": "Failed to load session requests; please retry",
+    "retry": "Retry",
+    "empty": "No local request records found for this session",
+    "recorded": "Recorded",
+    "sessionLabel": "Session",
+    "identity": "Started {start} · last activity {last} · current Provider {provider} · model {model}",
+    "fullLifecycle": "Full session lifecycle",
+    "requestCount": "{count} requests",
+    "fullOutcome": "{success} success / {failed} failed",
+    "enteredFrom": "Entered from request at {time}",
+    "range": {
+      "label": "Range",
+      "day": "Request day ({date})",
+      "full": "Full session",
+      "daySummary": "{count} requests in this session on {date}",
+      "fullSummary": "{count} requests · {start} to {end}"
+    },
+    "metrics": {
+      "dayRequests": "Requests on day",
+      "totalRequests": "Total requests",
+      "requestHint": "{success} success · {failed} failed",
+      "successRate": "Success rate",
+      "failureRate": "Failure rate",
+      "cacheShare": "Cache-read share",
+      "ratio": "{part} / {total}",
+      "cacheHint": "{hits} / {total} requests"
+    },
+    "filters": {
+      "label": "Request status",
+      "all": "All",
+      "success": "Success",
+      "failed": "Failed"
+    },
+    "timeline": {
+      "title": "Request timeline for this session",
+      "daySubtitle": "Request day · {date}",
+      "fullSubtitle": "Full lifecycle · {start}—{end}",
+      "footer": "{filtered} shown · {total} in range · scroll to inspect",
+      "empty": "No requests match this status"
+    },
+    "columns": {
+      "time": "Time",
+      "model": "Model",
+      "status": "Status",
+      "ttft": "First response",
+      "duration": "Duration",
+      "cost": "Cost"
+    },
+    "usage": {
+      "title": "Session usage & cache",
+      "day": "Request day",
+      "full": "Full-session totals",
+      "input": "Input Tokens",
+      "output": "Output Tokens",
+      "cacheRead": "Cache read",
+      "cacheCreate": "Cache write",
+      "totalCost": "Total estimated cost"
+    },
+    "source": {
+      "title": "Selected request",
+      "success": "{code} · Success",
+      "failure": "{code} · Failed",
+      "id": "Request ID #{id}",
+      "cost": "Cost",
+      "ttft": "First response",
+      "duration": "Duration",
+      "note": "Only structured metrics are stored, not raw request / response events."
+    },
+    "note": "Only locally retained request records (30 days) are included. Cache share = requests with cache reads / all requests. First response uses the first data event or JSON body."
+  },
+  "sessionsPage": {
+    "title": "Sessions",
+    "subtitle": "View recent sessions across clients; continuing happens in the original CLI.",
+    "filters": {
+      "all": "All sessions"
+    },
+    "searchPlaceholder": "⌕ Search sessions",
+    "empty": "No active session bindings",
+    "dateUnknown": "Unknown time",
+    "justNow": "Just now",
+    "minutesAgo": "{count} min ago",
+    "hoursAgo": "{count} h ago",
+    "unbind": "Unbind session",
+    "usage": "{count} requests · ↑{input} ↓{output} · {cost}",
+    "noUsage": "No usage recorded yet",
+    "messages": {
+      "unbound": "Unbound",
+      "unbindFailed": "Unbind failed, please retry"
+    }
+  },
+  "mcpPage": {
+    "title": "MCP Servers",
+    "subtitle": "Manage MCP servers, tool inventories and client integration.",
+    "actions": {
+      "diagnostics": "Gateway diagnostics",
+      "create": "Add MCP server",
+      "edit": "Edit",
+      "test": "Test connection",
+      "testing": "Testing…",
+      "openDiagnostics": "Open MCP diagnostics & tools"
+    },
+    "cli": {
+      "title": "CLI integration",
+      "subtitle": "Manage local MCP aggregation gateway injection for Claude Code and Codex independently.",
+      "injected": "Written to local config · restart {client} to apply",
+      "notInjected": "Not yet written to {client}'s local config",
+      "toggle": "Toggle MCP injection for {client}",
+      "help": "Injection only changes Portico-managed MCP entries and leaves other client MCP configuration untouched. Restart the corresponding CLI after changes."
+    },
+    "list": {
+      "title": "Configured servers",
+      "summary": "{enabled} enabled · {tools} tools",
+      "empty": "No MCP servers yet. Add one from the top right."
+    },
+    "status": {
+      "connected": "Healthy",
+      "connecting": "Connecting",
+      "failed": "Failed",
+      "disabled": "Disabled"
+    },
+    "localProcess": "local process",
+    "remoteService": "remote service",
+    "toolCount": "{count} tools",
+    "menu": {
+      "edit": "Edit",
+      "enable": "Enable",
+      "disable": "Disable",
+      "delete": "Delete"
+    },
+    "detail": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "transport": "Transport",
+      "command": "Command",
+      "url": "Endpoint",
+      "lastError": "Last error",
+      "toolsTitle": "Tool inventory",
+      "toolsEmpty": "No tools discovered yet",
+      "toolsMore": "… {count} more on the diagnostics page"
+    },
+    "delete": {
+      "title": "Delete MCP server",
+      "body": "Delete \"{name}\"? Its tools will be removed from the gateway immediately.",
+      "confirm": "Delete"
+    },
+    "messages": {
+      "toolsLoadFailed": "Failed to load tool inventory",
+      "testOk": "Connected, {count} tools discovered ({ms}ms)",
+      "testErr": "Connection failed: {error}",
+      "testFailed": "Connection test failed"
+    }
+  },
+  "mcpDiag": {
+    "gateway": {
+      "title": "MCP Diagnostics / Downstream Gateway",
+      "subtitle": "Verify the endpoints and tools the local aggregation gateway actually exposes to Claude Code, Codex and other downstream clients.",
+      "toTools": "Tool details →",
+      "cardTitle": "Local MCP aggregation gateway",
+      "running": "Healthy",
+      "idle": "Idle",
+      "copyEndpoint": "Copy endpoint",
+      "rediagnose": "Re-run diagnostics",
+      "rediagnosing": "Diagnosing…",
+      "metrics": {
+        "clients": "Downstream clients",
+        "clientsValue": "{count} clients",
+        "tools": "Exposed tools",
+        "toolsSub": "from {count} connected upstreams",
+        "conflicts": "Name conflicts",
+        "conflictsSub": "all unique",
+        "upstreams": "Upstream servers",
+        "upstreamsSub": "{count} enabled"
+      },
+      "detailTitle": "Gateway details",
+      "kv": {
+        "listen": "Listen address",
+        "endpoint": "MCP endpoint",
+        "transport": "Transport",
+        "protocol": "Protocol version",
+        "upstreams": "Upstream servers",
+        "naming": "Tool naming",
+        "conflict": "Conflict handling",
+        "conflictValue": "First registration wins; conflicts are logged",
+        "clients": "Client integration"
+      },
+      "injected": "Injected",
+      "notInjected": "Not injected",
+      "toolsTitle": "Tools visible downstream",
+      "toolsSub": "Upstream names, name transformation and Schema publish status",
+      "colName": "Downstream name",
+      "colSource": "Source / upstream tool",
+      "colSchema": "Schema",
+      "toolsEmpty": "No published tools",
+      "allTools": "{count} in total · view all",
+      "published": "Published"
+    },
+    "upstream": {
+      "title": "MCP Diagnostics / Upstream Server",
+      "subtitle": "Inspect connection state, runtime parameters and diagnostics of an upstream MCP.",
+      "backToGateway": "Back to gateway",
+      "lastProbe": "Last probe {time}",
+      "rediagnose": "Re-run diagnostics",
+      "probing": "Diagnosing…",
+      "toolList": "Tool inventory",
+      "metrics": {
+        "connection": "Connection",
+        "connectionOk": "Handshake succeeded",
+        "latency": "Latency",
+        "latencySub": "Latest probe",
+        "tools": "Tools discovered",
+        "toolsSub": "{count} published",
+        "transport": "Transport",
+        "local": "local process",
+        "remote": "remote service"
+      },
+      "detailTitle": "Upstream runtime details",
+      "kv": {
+        "transport": "Transport",
+        "command": "Command",
+        "url": "Endpoint",
+        "timeout": "Call timeout",
+        "enabled": "Enabled",
+        "enabledYes": "Enabled",
+        "enabledNo": "Disabled",
+        "lastError": "Last error",
+        "noError": "None"
+      },
+      "capTitle": "Capabilities & conclusions",
+      "capOk": "No blocking issues",
+      "capBlocked": "Connection problem",
+      "capTools": "Supported · {count} tools",
+      "capNotCollected": "Not collected",
+      "eventsTitle": "Recent diagnostic events",
+      "eventProbeOk": "{time} connect & tools/list succeeded",
+      "eventConnected": "Connected · tools/list succeeded",
+      "eventNone": "No diagnostic events",
+      "empty": "No upstream servers yet. Add one on the MCP page first."
+    },
+    "tools": {
+      "title": "MCP Diagnostics / Tool Details",
+      "subtitle": "Inspect each tool's description, schema and name transformation.",
+      "upstream": "Upstream tools",
+      "downstream": "Downstream tools",
+      "backToGateway": "Back to gateway",
+      "searchPlaceholder": "⌕  Search tool name or description…",
+      "allSources": "Source: all",
+      "count": "{count} tools",
+      "upstreamList": "Upstream tools ({count})",
+      "downstreamList": "Gateway tools/list ({count})",
+      "empty": "No tools",
+      "selected": "Selected",
+      "available": "Available",
+      "noDescription": "No description",
+      "infoTitle": "Basics",
+      "kv": {
+        "upstreamName": "Upstream name",
+        "publicName": "Downstream name",
+        "server": "Server",
+        "rw": "Read-only / destructive",
+        "readOnly": "read-only",
+        "writable": "write",
+        "destructive": "destructive"
+      },
+      "schemaTitle": "Input schema",
+      "noSchema": "No schema provided upstream"
+    },
+    "status": {
+      "connected": "Connected",
+      "connecting": "Connecting",
+      "failed": "Failed",
+      "disabled": "Disabled"
+    },
+    "messages": {
+      "loadFailed": "Failed to load diagnostics",
+      "copied": "Endpoint copied",
+      "copyFailed": "Copy failed",
+      "rediagnosed": "Diagnostics refreshed",
+      "testErr": "Connection failed: {error}",
+      "testFailed": "Connection test failed"
+    }
+  },
+  "settingsPage": {
+    "title": "Settings & WebDAV",
+    "subtitle": "App preferences, network options and external config sync.",
+    "appNetwork": "App & network",
+    "language": "Language",
+    "theme": "Theme",
+    "proxy": "HTTP proxy",
+    "proxyHint": "All provider requests go through this proxy by default (providers can override).",
+    "sync": {
+      "encrypted": "Locally encrypted",
+      "viewVersions": "View cloud versions",
+      "remoteFound": "Cloud snapshot available",
+      "remoteUnknown": "Cloud not queried yet",
+      "scope": "Sync scope: provider profiles, appearance preferences"
+    },
+    "versions": {
+      "title": "Cloud versions",
+      "subtitle": "Check time and content before restoring",
+      "remotePath": "Remote path",
+      "latest": "Latest · from {device} · app version {version}",
+      "unknown": "unknown",
+      "restore": "Restore",
+      "empty": "No remote snapshot yet",
+      "note": "A local backup is created before restoring, and the sync passphrase is required."
+    },
+    "restore": {
+      "title": "Restore config from cloud?",
+      "subtitle": "A local backup is created before restoring",
+      "warningTitle": "Content to restore",
+      "warningBody": "Provider profiles, appearance preferences",
+      "snapshotAt": "Cloud version: {time}",
+      "overwriteHint": "Unsynced local changes may be overwritten.",
+      "passphrase": "Sync passphrase",
+      "passphrasePlaceholder": "Enter the sync passphrase",
+      "passphraseHint": "Uses the saved passphrase by default; enter a different one if the cloud snapshot was encrypted with it.",
+      "confirm": "Restore",
+      "restoring": "Restoring…"
+    }
+  }
+}

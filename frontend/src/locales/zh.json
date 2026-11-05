@@ -1,0 +1,1040 @@
+{
+  "app": {
+    "title": "我的应用",
+    "login": "登录"
+  },
+  "menus": {
+    "general": "通用设置",
+    "shortcut": "快捷键",
+    "about": "关于"
+  },
+  "components": {
+    "common": {
+      "close": "关闭"
+    },
+    "provider": {
+      "modelWhitelist": {
+        "label": "模型白名单",
+        "tooltip": "声明该供应商支持的模型。支持精确匹配（claude-sonnet-4）和通配符（claude-*）",
+        "placeholder": "输入模型名称，如 claude-*",
+        "add": "添加",
+        "remove": "删除模型",
+        "examples": {
+          "title": "示例：",
+          "exact": "精确匹配",
+          "prefix": "前缀匹配所有 Claude 模型",
+          "vendor": "匹配带供应商前缀的模型"
+        }
+      },
+      "modelMapping": {
+        "label": "模型映射",
+        "tooltip": "将外部模型名称映射到供应商内部模型名称。支持通配符展开",
+        "keyPlaceholder": "外部模型名（如 claude-*）",
+        "valuePlaceholder": "内部模型名（如 anthropic/claude-*）",
+        "add": "添加",
+        "remove": "删除映射",
+        "edit": "编辑映射",
+        "confirm": "保存",
+        "cancel": "取消",
+        "examples": {
+          "title": "示例：",
+          "exact": "精确映射",
+          "wildcard": "通配符映射，自动展开 claude-sonnet-4 → anthropic/claude-sonnet-4",
+          "prefix": "前缀映射"
+        }
+      },
+      "requestBodyReplacements": {
+        "overrideLabel": "请求体覆写",
+        "overrideTooltip": "无论字段当前值是什么，都改写为目标值。路径不存在时会跳过。",
+        "replaceLabel": "请求体替换",
+        "replaceTooltip": "仅当字段当前值与匹配值一致时，才将其改写为目标值。路径不存在时会跳过。",
+        "pathPlaceholder": "JSON 路径，如 metadata.user_id",
+        "matchValuePlaceholder": "匹配值（JSON），如 \"old-value\"、0.2",
+        "valuePlaceholder": "JSON 值，如 \"fixed-user\"、0.2、true、null、{'{\"x\":1}'}",
+        "add": "添加",
+        "remove": "删除规则",
+        "overrideExamples": {
+          "title": "示例：",
+          "string": "覆写已有字符串字段",
+          "number": "写入数字 JSON 值",
+          "object": "写入对象 JSON 值"
+        },
+        "replaceExamples": {
+          "title": "示例：",
+          "hint": "仅当字段当前值等于匹配值时才改写",
+          "string": "当 model 等于指定值时替换为其他模型"
+        }
+      }
+    },
+    "themesetting": {
+      "select": {
+        "opt_system": "跟随系统",
+        "opt_light": "亮色模式",
+        "opt_dark": "暗色模式"
+      }
+    },
+    "general": {
+      "title": {
+        "power": "权限设置",
+        "application": "应用设置",
+        "network": "网络设置",
+        "exterior": "外观设置",
+        "update": "应用更新",
+        "sync": "配置同步（WebDAV）"
+      },
+      "label": {
+        "assistant_access": "辅助功能访问权限",
+        "disk_access": "完全磁盘访问权限",
+        "startup": "登录时启动",
+        "language": "界面语言",
+        "theme": "主题模式",
+        "heatmap": "显示主界面热力墙",
+        "homeTitle": "显示首页标题",
+        "automatic_up": "自动检查更新",
+        "next_up": "下次启动自动检查更新",
+        "proxy": "HTTP 代理"
+      },
+      "sublabel": {
+        "sb_assistant_access": "需要无障碍访问权限来操作剪切板内容",
+        "sb_disk_access": "需要完全磁盘访问权限来实现文件预览"
+      },
+      "placeholder": {
+        "proxy": "例如 http://127.0.0.1:7890"
+      },
+      "buttons": {
+        "authorized": "已授权",
+        "go_authorized": "去授权",
+        "back": "返回首页",
+        "save": "保存"
+      },
+      "messages": {
+        "loadFailed": "加载设置失败",
+        "saveFailed": "保存设置失败，请重试。",
+        "invalidProxyUrl": "代理地址必须以 http://、https://、socks5:// 或 socks5h:// 开头"
+      },
+      "sync": {
+        "hint": "通过 WebDAV 将供应商配置与外观偏好同步到云端。配置在本地通过同步口令端到端加密，云端服务商无法读取明文。",
+        "fields": {
+          "endpoint": "WebDAV 服务器地址",
+          "username": "用户名",
+          "remotePath": "远端路径",
+          "appPassword": "WebDAV 密码 / 应用密码",
+          "syncPassphrase": "同步口令（用于加密）"
+        },
+        "actions": {
+          "save": "保存",
+          "saving": "保存中…",
+          "test": "测试连接",
+          "testing": "测试中…",
+          "viewMeta": "查看云端版本",
+          "loadingMeta": "查询中…",
+          "upload": "上传到云端",
+          "uploading": "上传中…",
+          "restore": "从云端恢复",
+          "restoring": "恢复中…",
+          "show": "显示",
+          "hide": "隐藏"
+        },
+        "meta": {
+          "title": "云端快照",
+          "summary": "{updatedAt} · {deviceName} · {appVersion}",
+          "empty": "尚未查询，或云端暂无快照。",
+          "unknown": "未知"
+        },
+        "messages": {
+          "loadFailed": "加载同步设置失败",
+          "saveSuccess": "已保存同步设置",
+          "saveFailed": "保存同步设置失败",
+          "saveBeforeAction": "请先点击保存按钮再执行该操作",
+          "connectionSuccess": "WebDAV 连接成功",
+          "connectionFailed": "WebDAV 连接失败",
+          "remoteEmpty": "云端暂未上传过配置快照",
+          "inspectFailed": "查询云端快照失败",
+          "uploadSuccess": "已上传到云端",
+          "uploadFailed": "上传到云端失败",
+          "restoreConfirm": "确认用云端配置覆盖本地配置吗？本地将自动生成回滚快照。",
+          "restoreSuccess": "已从云端恢复，回滚快照：{rollback}",
+          "restoreFailed": "从云端恢复失败",
+          "restoreFailedWithRollback": "从云端恢复失败，已生成回滚快照：{rollback}"
+        }
+      }
+    },
+    "mcp": {
+      "hero": {
+        "eyebrow": "MCP 网关",
+        "title": "MCP 服务管理",
+        "lead": "聚合多个 MCP 服务为一个本地端点，注入后 Claude Code / Codex 自动发现全部工具。"
+      },
+      "actions": {
+        "back": "返回主页",
+        "refresh": "刷新"
+      },
+      "cli": {
+        "title": "CLI 接入",
+        "endpoint": "聚合端点",
+        "copy": "复制",
+        "inject": "注入",
+        "remove": "移除",
+        "injected": "已注入",
+        "notInjected": "未注入",
+        "helpTitle": "注意事项与手动配置",
+        "helpRestart": "注入后需重启 CLI（或 Claude Code 中 /mcp 重连）生效。",
+        "helpRefresh": "运行期增删服务：Claude Code 自动刷新工具列表；Codex 需重启才感知。",
+        "helpContext": "模型流量走本网关时 Claude Code 会全量加载工具 schema，请保持工具集精简。",
+        "helpCodexBackend": "Codex 的 MCP 工具仅在路由到 OpenAI/Azure 兼容上游时可用。",
+        "manualTitle": "手动配置（等价命令）"
+      },
+      "servers": {
+        "title": "MCP 服务",
+        "totalTools": "共 {count} 个工具",
+        "add": "新增服务",
+        "empty": "暂无 MCP 服务，点击右上角新增",
+        "toolCount": "{count} 工具",
+        "toggle": "启用/禁用",
+        "edit": "编辑",
+        "delete": "删除"
+      },
+      "status": {
+        "connected": "已连接",
+        "connecting": "连接中",
+        "failed": "连接失败",
+        "disabled": "已禁用"
+      },
+      "form": {
+        "titleNew": "新增 MCP 服务",
+        "titleEdit": "编辑 MCP 服务",
+        "name": "名称（工具命名空间前缀）",
+        "namePlaceholder": "字母数字开头，可含 - 和 _，如 github",
+        "type": "类型",
+        "typeStdio": "stdio（本地进程）",
+        "typeHttp": "HTTP（远程服务）",
+        "command": "启动命令",
+        "args": "参数（空格分隔）",
+        "argsPlaceholder": "-y {'@'}modelcontextprotocol/server-filesystem /tmp",
+        "env": "环境变量（每行 KEY=VALUE）",
+        "url": "服务地址",
+        "headers": "请求头（每行 KEY=VALUE）",
+        "kvPlaceholder": "KEY=VALUE\nANOTHER=...",
+        "timeout": "调用超时（秒）",
+        "test": "测试连接",
+        "testing": "测试中...",
+        "testOk": "连接成功，发现 {count} 个工具（{ms}ms）",
+        "testErr": "连接失败：{error}",
+        "cancel": "取消",
+        "save": "保存",
+        "saving": "保存中...",
+        "errors": {
+          "name": "名称需以字母或数字开头，仅含字母数字、- 和 _（不含连续 __），最长 32 字符",
+          "command": "stdio 类型必须填写启动命令",
+          "url": "HTTP 类型必须填写服务地址"
+        },
+        "subtitleStdio": "stdio 适用于本地命令行进程",
+        "subtitleHttp": "配置远程 HTTP 端点与可选认证",
+        "auth": "认证方式",
+        "authNone": "无",
+        "authCustom": "自定义请求头",
+        "token": "访问令牌",
+        "argsHint": "参数按顺序配置，不要将整行拼成 shell 命令。",
+        "saveAndTest": "保存并测试"
+      },
+      "confirm": {
+        "title": "删除 MCP 服务",
+        "body": "确认删除「{name}」吗？删除后其工具将立即从网关移除。",
+        "delete": "删除"
+      },
+      "messages": {
+        "loadFailed": "加载 MCP 配置失败",
+        "statusLoadFailed": "刷新状态失败",
+        "saved": "已保存",
+        "saveFailed": "保存失败",
+        "deleted": "已删除",
+        "deleteFailed": "删除失败",
+        "toggleFailed": "切换启用状态失败",
+        "testFailed": "测试连接失败",
+        "injected": "已注入，重启 CLI 后生效",
+        "injectionRemoved": "已移除注入",
+        "injectionFailed": "注入操作失败",
+        "copied": "端点已复制",
+        "copyFailed": "复制失败"
+      }
+    },
+    "logs": {
+      "filters": {
+        "platform": "平台",
+        "allPlatforms": "全部平台",
+        "provider": "供应商",
+        "allProviders": "全部供应商",
+        "range": "时间范围",
+        "costTier": "金额等级",
+        "allCostTiers": "全部金额",
+        "httpStatus": "响应码",
+        "allHttpStatus": "全部响应码",
+        "httpStatus200": "仅 200",
+        "costTiers": {
+          "low": "低金额",
+          "medium": "中金额",
+          "high": "高金额"
+        },
+        "ranges": {
+          "today": "今天",
+          "last3days": "近三天",
+          "last7days": "近一周"
+        },
+        "providerPlaceholder": "输入供应商名称",
+        "limit": "条数上限"
+      }
+    }
+  },
+  "common": {
+    "cancel": "取消",
+    "close": "关闭",
+    "save": "保存",
+    "saving": "保存中…",
+    "deleting": "删除中…",
+    "loading": "加载中…"
+  },
+  "shell": {
+    "nav": {
+      "dashboard": "工作台",
+      "providers": "供应商",
+      "providerArchive": "归档管理",
+      "logs": "使用记录",
+      "sessions": "会话",
+      "mcp": "MCP 服务",
+      "mcpDiagnostics": "诊断",
+      "settings": "设置"
+    }
+  },
+  "quickSwitch": {
+    "title": "切换供应商",
+    "subtitle": "仅影响当前选择的 CLI 客户端",
+    "currentClient": "当前客户端",
+    "currentPrefix": "当前：",
+    "noCurrent": "未设置",
+    "searchPlaceholder": "⌕  搜索供应商名称、模型或端点…",
+    "available": "可用配置",
+    "empty": "没有匹配的供应商",
+    "currentActive": "当前生效",
+    "hintSelect": "选择",
+    "hintApply": "应用配置",
+    "hintClose": "关闭",
+    "advanced": "高级配置 ↗",
+    "apply": "应用配置",
+    "applied": "已将 {platform} 切换到「{name}」",
+    "applyFailed": "应用配置失败"
+  },
+  "dashboard": {
+    "title": "工作台",
+    "subtitle": "你的 AI 编程环境，一切就绪。",
+    "quickSwitch": {
+      "label": "快速切换当前 CLI 供应商",
+      "hint": "选择客户端、搜索配置，回车即可应用",
+      "open": "打开切换面板"
+    },
+    "clients": {
+      "title": "你的编程客户端",
+      "subtitle": "每个客户端独立管理当前配置，切换互不影响。",
+      "applied": "配置已应用",
+      "notApplied": "未接管",
+      "currentProvider": "当前供应商",
+      "none": "未设置",
+      "switch": "切换配置",
+      "relay": "接入 Portico",
+      "toggleFailed": "切换接入状态失败"
+    },
+    "frequent": {
+      "title": "常用配置"
+    },
+    "recent": {
+      "empty": "暂无最近使用的会话",
+      "todayAt": "今天 {time}"
+    },
+    "local": {
+      "title": "本地服务",
+      "healthy": "运行正常",
+      "degraded": "存在异常",
+      "idle": "未启用",
+      "endpoint": "MCP 聚合端点",
+      "copy": "复制端点",
+      "mcpServices": "MCP 服务",
+      "summary": "{servers} 个服务 · {tools} 个工具",
+      "manage": "管理 MCP 服务"
+    }
+  },
+  "providersPage": {
+    "title": "供应商管理",
+    "subtitle": "管理服务端点、模型和凭证；各 CLI 独立使用。",
+    "actions": {
+      "copyAcross": "跨 CLI 快速复制",
+      "archiveManagement": "归档管理",
+      "back": "返回供应商",
+      "create": "新增供应商",
+      "edit": "编辑配置",
+      "test": "测试连接",
+      "testing": "测试中…",
+      "restore": "恢复供应商",
+      "restoring": "恢复中…",
+      "setCurrent": "设为当前",
+      "current": "当前生效"
+    },
+    "filters": {
+      "all": "全部配置",
+      "count": "{count} 个配置"
+    },
+    "list": {
+      "title": "已配置的供应商",
+      "subtitle": "名称、客户端适用范围与当前使用状态",
+      "empty": "暂无供应商，点击右上角新增"
+    },
+    "status": {
+      "active": "当前生效",
+      "verified": "已验证",
+      "failed": "检测失败",
+      "unverified": "未验证",
+      "archived": "已归档"
+    },
+    "detail": {
+      "title": "当前配置详情",
+      "baseUrl": "API BASE URL",
+      "apiKey": "API Key · 本地明文",
+      "copy": "复制",
+      "lastTest": "最近验证",
+      "neverTested": "尚未测试",
+      "testOk": "连接成功 · {ms} ms · 今天 {time}",
+      "testErr": "连接失败 · {error} · 今天 {time}",
+      "privacyNote": "本地 Key 明文可见；分享屏幕前请注意隐私。"
+    },
+    "menu": {
+      "open": "供应商操作",
+      "edit": "编辑配置",
+      "advanced": "高级配置",
+      "copyAcross": "跨 CLI 复制",
+      "archive": "归档供应商",
+      "restore": "恢复",
+      "delete": "删除"
+    },
+    "archiveConfirm": {
+      "title": "确认归档供应商",
+      "subtitle": "归档后可随时恢复，不会删除配置",
+      "warningTitle": "归档后将从选择列表隐藏",
+      "warningBody": "不会自动修改当前默认供应商，原有配置会完整保留。",
+      "target": "供应商：{name}",
+      "confirm": "确认归档",
+      "confirming": "归档中…"
+    },
+    "archivedPage": {
+      "title": "已归档供应商",
+      "subtitle": "归档的供应商不会出现在选择列表；恢复后可重新选择。",
+      "all": "全部归档",
+      "count": "{count} 个已归档",
+      "listTitle": "已归档的供应商",
+      "listSubtitle": "归档时间、所属客户端与恢复操作",
+      "empty": "暂无已归档供应商",
+      "detailTitle": "归档详情",
+      "archivedAt": "归档时间",
+      "unknownTime": "未记录",
+      "archivedOn": "归档于 {date}",
+      "archivedOnUnknown": "归档时间未记录",
+      "rulesTitle": "恢复规则",
+      "rulesBody": "恢复后重新出现在供应商选择列表，不会自动切换当前供应商；API Key、模型映射和高级配置都会保留。",
+      "restoreNote": "恢复后重新进入选择列表，不会自动应用到 CLI。",
+      "delete": "删除供应商"
+    },
+    "editor": {
+      "titleNew": "新增供应商",
+      "titleEdit": "编辑供应商",
+      "subtitle": "本地 Key 明文展示；支持复制和编辑",
+      "name": "配置名称",
+      "namePlaceholder": "如 Anthropic Official",
+      "nameLocked": "已有供应商的名称不可修改（作为稳定标识）。",
+      "platform": "服务类型",
+      "apiUrl": "API Base URL",
+      "officialSite": "官方站点（可选）",
+      "apiKey": "API Key · 本地明文",
+      "keyHint": "Key 在本地直接显示，支持复制和编辑。",
+      "copyKey": "复制 Key",
+      "save": "保存配置"
+    },
+    "advanced": {
+      "title": "高级配置",
+      "subtitle": "代理模式、TLS 与模型控制；规则按配置顺序应用",
+      "tabConnection": "连接与模型",
+      "tabBody": "请求体改写",
+      "proxyMode": "代理模式",
+      "proxyInherit": "跟随全局",
+      "proxyCustom": "自定义代理",
+      "proxyDirect": "禁用代理",
+      "proxyUrl": "代理地址",
+      "skipTls": "跳过 TLS 证书验证（不安全）",
+      "skipTlsHint": "仅用于本地抓包调试，开启后上游证书不再校验。",
+      "scopeHint": "高级设置只作用于当前供应商配置。",
+      "save": "保存设置"
+    },
+    "delete": {
+      "title": "确认删除",
+      "subtitle": "删除后不能直接恢复",
+      "warningTitle": "此操作不可直接撤销。",
+      "warningBody": "正在使用的客户端不会自动切换。",
+      "target": "供应商：{name}",
+      "confirm": "确认删除"
+    },
+    "copy": {
+      "title": "跨 CLI 快速复制",
+      "subtitle": "基于现有配置生成目标草稿，不覆盖源配置",
+      "sourceReadonly": "源配置只读",
+      "newDraft": "新建目标草稿",
+      "pending": "待生成",
+      "swap": "切换目标",
+      "rulesTitle": "填充规则",
+      "rulesHint": "自动填充通用字段；协议专属配置会标注为需确认。",
+      "colField": "配置字段",
+      "colAction": "处理方式",
+      "colStatus": "复制后状态",
+      "rules": {
+        "baseUrl": {
+          "field": "API Base URL",
+          "action": "填充到目标草稿",
+          "status": "需确认目标协议"
+        },
+        "apiKey": {
+          "field": "API Key",
+          "action": "复制凭证",
+          "status": "仅当目标端兼容时"
+        },
+        "model": {
+          "field": "默认模型",
+          "action": "填充并允许编辑",
+          "status": "检查目标模型名"
+        },
+        "headers": {
+          "field": "自定义请求头",
+          "action": "复制可识别的通用项",
+          "status": "协议专属项跳过"
+        },
+        "proxy": {
+          "field": "代理 / TLS",
+          "action": "复制通用网络设置",
+          "status": "复核 TLS 风险"
+        },
+        "whitelist": {
+          "field": "模型白名单 / 映射",
+          "action": "按目标类型生成草稿",
+          "status": "逐项检查"
+        }
+      },
+      "warnTitle": "Claude Messages 与 Codex Responses 协议并不天然兼容。",
+      "warnBody": "若上游是兼容网关，请确认目标端点支持对应协议；生成草稿后先测试连接。",
+      "note": "方向可切换；源配置始终保留。",
+      "confirm": "生成目标草稿"
+    },
+    "messages": {
+      "loadFailed": "加载供应商失败",
+      "saveFailed": "保存失败",
+      "saved": "已保存",
+      "deleted": "已删除",
+      "deleteFailed": "删除失败",
+      "applied": "已将「{name}」设为当前",
+      "copied": "已复制",
+      "copyFailed": "复制失败",
+      "testFailed": "测试连接失败",
+      "archived": "已归档「{name}」",
+      "restored": "已恢复「{name}」",
+      "archiveBlockedBecauseDefault": "默认供应商不能归档，请先切换默认配置"
+    },
+    "form": {
+      "errors": {
+        "nameRequired": "请输入配置名称",
+        "duplicateName": "同名配置已存在",
+        "invalidUrl": "请输入合法的 http(s) URL",
+        "proxyUrlRequired": "自定义代理模式下必须填写代理地址",
+        "invalidProxyUrl": "代理地址必须以 http://、https://、socks5:// 或 socks5h:// 开头"
+      }
+    }
+  },
+  "logsPage": {
+    "title": "使用记录",
+    "subtitle": {
+      "overview": "分析今日费用、请求质量与 Token 用量，详细请求请切换到请求日志。",
+      "requests": "逐条查看请求成本、Token、首响应与总耗时，并可追踪所属完整会话。",
+      "app": "查看服务启动、MCP 连接、上游错误与应用内部事件。"
+    },
+    "tabs": {
+      "overview": "总览",
+      "requests": "请求日志",
+      "app": "应用日志",
+      "hint": "分析整体使用情况  ·  查询每次请求  ·  排查应用运行问题"
+    },
+    "appLog": {
+      "levelLabel": "级别",
+      "levels": {
+        "all": "全部级别",
+        "none": "无级别"
+      },
+      "keywordPlaceholder": "⌕  搜索日志内容、文件名或关键字…",
+      "follow": "自动跟随",
+      "refresh": "刷新",
+      "empty": "当前条件下暂无应用日志",
+      "loading": "正在读取日志…",
+      "truncatedHint": "日志文件较大，仅显示最近部分内容"
+    },
+    "overview": {
+      "loadFailed": "使用统计加载失败，请稍后重试",
+      "rangeLabel": "统计范围",
+      "todayOption": "今日 · {date}",
+      "metricsTitle": "{range}关键指标",
+      "metrics": {
+        "cost": "{range}请求金额",
+        "costHint": "USD · 预估费用",
+        "requests": "请求次数",
+        "requestsHint": "{range}累计",
+        "successRate": "成功率",
+        "successHint": "异常请求 {count} 次",
+        "duration": "平均总耗时",
+        "durationHint": "所有请求平均值"
+      },
+      "tokens": {
+        "title": "Token 用量",
+        "subtitle": "缓存读取可能计入输入 Token；推理 Token 可能计入输出 Token",
+        "cacheHits": "缓存命中请求 {count}",
+        "total": "Token 总量",
+        "input": "输入 Token",
+        "output": "输出 Token",
+        "reasoning": "推理 Token",
+        "cacheRead": "缓存读取",
+        "cacheCreate": "缓存写入"
+      },
+      "trend": {
+        "title": "使用趋势",
+        "subtitle": "近 7 日 · 当前展示{metric}（{unit}）",
+        "metricLabel": "趋势指标",
+        "chartLabel": "{metric}近 7 日趋势图",
+        "table": "数据表",
+        "tableCaption": "近 7 日{metric}数据",
+        "day": "日期",
+        "empty": "当前范围暂无趋势数据",
+        "metrics": {
+          "cost": "金额",
+          "input": "输入",
+          "output": "输出",
+          "cacheCreate": "缓存写入",
+          "reasoning": "推理",
+          "cacheRead": "缓存读取"
+        }
+      },
+      "note": "金额与 Token 使用各自独立单位；Token 总量按输入 + 输出计算，缓存与推理可能已包含其中。"
+    },
+    "recent": {
+      "title": "详细请求日志",
+      "subtitle": "Token 按「输入 / 输出」与「缓存读取 / 写入」双行展示",
+      "tokenHint": "输入 / 输出与缓存读取 / 写入采用双行展示；推理 Token 可能已计入输出。"
+    },
+    "filteredSummary": {
+      "title": "筛选结果汇总",
+      "subtitle": "按全部匹配记录统计",
+      "cost": "金额合计",
+      "requests": "请求数",
+      "totalTokens": "Token 总量",
+      "inputTokens": "输入 Token",
+      "outputTokens": "输出 Token",
+      "cacheRead": "缓存读取",
+      "cacheCreate": "缓存写入",
+      "reasoning": "推理 Token"
+    },
+    "columns": {
+      "time": "时间",
+      "client": "客户端",
+      "provider": "供应商",
+      "model": "模型",
+      "tokens": "Token 用量",
+      "cost": "金额",
+      "ttft": "首响应",
+      "ttftHint": "首个 data 事件或 JSON body 的到达耗时；历史记录暂无数据",
+      "duration": "总耗时",
+      "status": "状态",
+      "actions": "操作"
+    },
+    "filters": {
+      "platform": "客户端",
+      "provider": "供应商",
+      "status": "请求状态",
+      "range": "时间范围",
+      "pageSize": "每页条数",
+      "allPlatforms": "客户端：全部",
+      "allProviders": "供应商：全部",
+      "allStatus": "状态：全部",
+      "successStatus": "状态：成功",
+      "failedStatus": "状态：失败",
+      "rangeOption": "时间：{range}",
+      "pageSizeOption": "每页 {count} 条",
+      "costTier": "请求金额区间",
+      "costHint": "低 / 中 / 高按单次请求金额划分 · 阈值由后端统一定义",
+      "costTiers": {
+        "all": "全部",
+        "low": "低",
+        "medium": "中",
+        "high": "高"
+      },
+      "ranges": {
+        "today": "今日",
+        "last3days": "近 3 天",
+        "last7days": "近 7 天"
+      }
+    },
+    "actions": {
+      "export": "导出记录",
+      "exporting": "导出中…",
+      "refresh": "刷新",
+      "trace": "追踪会话",
+      "traceTitle": "查看所属完整会话",
+      "traceUnavailable": "该请求没有会话 ID"
+    },
+    "tokens": {
+      "inputShort": "入",
+      "outputShort": "出",
+      "cacheReadShort": "缓存读",
+      "cacheWriteShort": "写"
+    },
+    "loading": "正在加载请求记录…",
+    "empty": "当前条件下暂无请求记录",
+    "status": {
+      "success": "成功",
+      "failure": "失败"
+    },
+    "pager": {
+      "total": "共 {total} 条",
+      "range": "展示 {start}–{end} 条 · 共 {total} 条",
+      "current": "第 {page} / {total} 页",
+      "prev": "上一页",
+      "next": "下一页"
+    },
+    "messages": {
+      "exported": "已导出 {count} 条记录",
+      "exportFailed": "导出失败"
+    }
+  },
+  "sessionTrace": {
+    "title": "会话追踪",
+    "subtitle": "使用记录  /  请求日志  /  会话追踪",
+    "back": "返回请求列表",
+    "loading": "正在加载会话请求…",
+    "loadFailed": "会话请求加载失败，请重试",
+    "retry": "重试",
+    "empty": "未找到该会话的本地请求记录",
+    "recorded": "已记录",
+    "sessionLabel": "会话",
+    "identity": "{start} 开始 · 最后活动 {last} · 当前 Provider {provider} · 模型 {model}",
+    "fullLifecycle": "会话全周期",
+    "requestCount": "{count} 次请求",
+    "fullOutcome": "{success} 成功 / {failed} 失败",
+    "enteredFrom": "从 {time} 请求进入",
+    "range": {
+      "label": "范围",
+      "day": "请求发生当日（{date}）",
+      "full": "全部会话",
+      "daySummary": "{date} 该会话发送 {count} 次请求",
+      "fullSummary": "共 {count} 次请求 · 覆盖 {start} 至 {end}"
+    },
+    "metrics": {
+      "dayRequests": "当日请求数",
+      "totalRequests": "总请求数",
+      "requestHint": "{success} 成功 · {failed} 失败",
+      "successRate": "成功率",
+      "failureRate": "失败率",
+      "cacheShare": "缓存读取占比",
+      "ratio": "{part} / {total}",
+      "cacheHint": "{hits} / {total} 次请求"
+    },
+    "filters": {
+      "label": "请求状态",
+      "all": "全部",
+      "success": "成功",
+      "failed": "失败"
+    },
+    "timeline": {
+      "title": "此会话的请求轨迹",
+      "daySubtitle": "请求发生当日 · {date}",
+      "fullSubtitle": "全周期 · {start}—{end}",
+      "footer": "当前 {filtered} 条 · 范围共 {total} 条 · 可滚动查看",
+      "empty": "当前状态下暂无请求"
+    },
+    "columns": {
+      "time": "时间",
+      "model": "模型",
+      "status": "状态",
+      "ttft": "首响应",
+      "duration": "总耗时",
+      "cost": "金额"
+    },
+    "usage": {
+      "title": "会话用量与缓存",
+      "day": "请求发生当日",
+      "full": "全周期累计",
+      "input": "输入 Token",
+      "output": "输出 Token",
+      "cacheRead": "缓存读取",
+      "cacheCreate": "缓存写入",
+      "totalCost": "累计费用（预估）"
+    },
+    "source": {
+      "title": "当前选中请求",
+      "success": "{code} · 成功",
+      "failure": "{code} · 失败",
+      "id": "请求 ID #{id}",
+      "cost": "金额",
+      "ttft": "首响应",
+      "duration": "总耗时",
+      "note": "仅保存结构化指标，不保存原始请求 / 响应事件。"
+    },
+    "note": "仅统计本地保留的请求记录（30 天）；缓存占比 = 有缓存读取的请求数 / 全部请求数；首响应按首个 data 事件或 JSON body 计时。"
+  },
+  "sessionsPage": {
+    "title": "会话管理",
+    "subtitle": "跨客户端查看近期会话；继续操作由原 CLI 执行。",
+    "filters": {
+      "all": "全部会话"
+    },
+    "searchPlaceholder": "⌕ 搜索会话",
+    "empty": "暂无活跃会话绑定",
+    "dateUnknown": "时间未知",
+    "justNow": "刚刚",
+    "minutesAgo": "{count} 分钟前",
+    "hoursAgo": "{count} 小时前",
+    "unbind": "解绑会话",
+    "usage": "{count} 次请求 · ↑{input} ↓{output} · {cost}",
+    "noUsage": "暂无用量记录",
+    "messages": {
+      "unbound": "已解绑",
+      "unbindFailed": "解绑失败，请重试"
+    }
+  },
+  "mcpPage": {
+    "title": "MCP 服务",
+    "subtitle": "管理 MCP 服务、工具清单和客户端接入状态。",
+    "actions": {
+      "diagnostics": "网关诊断",
+      "create": "新增 MCP 服务",
+      "edit": "编辑服务",
+      "test": "测试连接",
+      "testing": "测试中…",
+      "openDiagnostics": "打开 MCP 诊断与工具详情"
+    },
+    "cli": {
+      "title": "CLI 接入",
+      "subtitle": "分别管理本地聚合 MCP 网关在 Claude Code 与 Codex 中的配置注入。",
+      "injected": "已写入本地配置 · 重启 {client} 后生效",
+      "notInjected": "尚未写入 {client} 本地配置",
+      "toggle": "切换 {client} 的 MCP 注入",
+      "help": "注入或取消只修改 Portico 管理的 MCP 配置项，不影响客户端其他 MCP 配置；变更后需重启对应 CLI。"
+    },
+    "list": {
+      "title": "已配置的服务",
+      "summary": "{enabled} 个已启用 · {tools} 个工具",
+      "empty": "暂无 MCP 服务，点击右上角新增"
+    },
+    "status": {
+      "connected": "运行正常",
+      "connecting": "连接中",
+      "failed": "连接失败",
+      "disabled": "未启用"
+    },
+    "localProcess": "本地进程",
+    "remoteService": "远程服务",
+    "toolCount": "{count} 个工具",
+    "menu": {
+      "edit": "编辑",
+      "enable": "启用",
+      "disable": "禁用",
+      "delete": "删除"
+    },
+    "detail": {
+      "enabled": "已启用",
+      "disabled": "未启用",
+      "transport": "传输类型",
+      "command": "启动命令",
+      "url": "服务地址",
+      "lastError": "最近错误",
+      "toolsTitle": "工具清单",
+      "toolsEmpty": "暂无已发现工具",
+      "toolsMore": "… 另有 {count} 个，详见诊断页"
+    },
+    "delete": {
+      "title": "删除 MCP 服务",
+      "body": "确认删除「{name}」吗？删除后其工具将立即从网关移除。",
+      "confirm": "删除"
+    },
+    "messages": {
+      "toolsLoadFailed": "加载工具清单失败",
+      "testOk": "连接成功，发现 {count} 个工具（{ms}ms）",
+      "testErr": "连接失败：{error}",
+      "testFailed": "测试连接失败"
+    }
+  },
+  "mcpDiag": {
+    "gateway": {
+      "title": "MCP 诊断 / 下游网关",
+      "subtitle": "确认本地聚合网关对 Claude Code、Codex 等下游客户端实际暴露的端点与工具。",
+      "toTools": "工具详情 →",
+      "cardTitle": "本地 MCP 聚合网关",
+      "running": "运行正常",
+      "idle": "未启用",
+      "copyEndpoint": "复制端点",
+      "rediagnose": "重新诊断",
+      "rediagnosing": "诊断中…",
+      "metrics": {
+        "clients": "下游连接",
+        "clientsValue": "{count} 个客户端",
+        "tools": "暴露工具",
+        "toolsSub": "来自 {count} 个已连接上游",
+        "conflicts": "命名冲突",
+        "conflictsSub": "全部唯一",
+        "upstreams": "上游服务",
+        "upstreamsSub": "{count} 个已启用"
+      },
+      "detailTitle": "网关详细信息",
+      "kv": {
+        "listen": "监听地址",
+        "endpoint": "MCP Endpoint",
+        "transport": "传输协议",
+        "protocol": "协议版本",
+        "upstreams": "上游服务",
+        "naming": "工具命名策略",
+        "conflict": "冲突处理",
+        "conflictValue": "重名时先注册者保留并告警",
+        "clients": "客户端配置"
+      },
+      "injected": "已注入",
+      "notInjected": "未注入",
+      "toolsTitle": "下游实际可见的 Tools",
+      "toolsSub": "对照上游原始名称、命名转换与 Schema 发布状态",
+      "colName": "下游工具名",
+      "colSource": "来源 / 上游工具",
+      "colSchema": "Schema",
+      "toolsEmpty": "暂无已发布工具",
+      "allTools": "共 {count} 个 · 查看全部",
+      "published": "已发布"
+    },
+    "upstream": {
+      "title": "MCP 诊断 / 上游服务",
+      "subtitle": "查看上游 MCP 的连接状态、运行参数与诊断结果。",
+      "backToGateway": "返回网关诊断",
+      "lastProbe": "上次诊断 {time}",
+      "rediagnose": "重新诊断",
+      "probing": "诊断中…",
+      "toolList": "工具清单",
+      "metrics": {
+        "connection": "连接状态",
+        "connectionOk": "握手成功",
+        "latency": "响应延迟",
+        "latencySub": "最近一次探测",
+        "tools": "已发现工具",
+        "toolsSub": "{count} 个已发布",
+        "transport": "传输类型",
+        "local": "本地进程",
+        "remote": "远程服务"
+      },
+      "detailTitle": "上游 MCP 运行详情",
+      "kv": {
+        "transport": "传输类型",
+        "command": "启动命令",
+        "url": "服务地址",
+        "timeout": "调用超时",
+        "enabled": "启用状态",
+        "enabledYes": "已启用",
+        "enabledNo": "未启用",
+        "lastError": "最近错误",
+        "noError": "无"
+      },
+      "capTitle": "能力与诊断结论",
+      "capOk": "无阻断问题",
+      "capBlocked": "存在连接问题",
+      "capTools": "支持 · {count} 个工具",
+      "capNotCollected": "未采集",
+      "eventsTitle": "最近诊断事件",
+      "eventProbeOk": "{time} 连接与 tools/list 成功",
+      "eventConnected": "连接正常 · tools/list 成功",
+      "eventNone": "暂无诊断事件",
+      "empty": "暂无上游服务，请先在 MCP 服务页新增"
+    },
+    "tools": {
+      "title": "MCP 诊断 / 工具详情",
+      "subtitle": "查看每个工具的描述、Schema 与命名转换结果。",
+      "upstream": "上游工具",
+      "downstream": "下游工具",
+      "backToGateway": "返回网关诊断",
+      "searchPlaceholder": "⌕  搜索工具名称或描述…",
+      "allSources": "来源：全部",
+      "count": "{count} 个工具",
+      "upstreamList": "上游工具（{count}）",
+      "downstreamList": "当前网关 tools/list（{count}）",
+      "empty": "暂无工具",
+      "selected": "已选中",
+      "available": "可用",
+      "noDescription": "无描述",
+      "infoTitle": "基本信息",
+      "kv": {
+        "upstreamName": "上游工具名",
+        "publicName": "下游暴露名",
+        "server": "所属服务",
+        "rw": "只读 / 破坏性",
+        "readOnly": "只读",
+        "writable": "写入操作",
+        "destructive": "破坏性"
+      },
+      "schemaTitle": "输入参数 Schema",
+      "noSchema": "上游未提供 Schema"
+    },
+    "status": {
+      "connected": "连接正常",
+      "connecting": "连接中",
+      "failed": "连接失败",
+      "disabled": "未启用"
+    },
+    "messages": {
+      "loadFailed": "加载诊断数据失败",
+      "copied": "端点已复制",
+      "copyFailed": "复制失败",
+      "rediagnosed": "诊断已刷新",
+      "testErr": "连接失败：{error}",
+      "testFailed": "测试连接失败"
+    }
+  },
+  "settingsPage": {
+    "title": "设置与 WebDAV",
+    "subtitle": "应用偏好、网络选项与外部配置同步。",
+    "appNetwork": "应用与网络",
+    "language": "语言",
+    "theme": "主题模式",
+    "proxy": "HTTP 代理",
+    "proxyHint": "所有供应商请求默认经由此代理（供应商可单独覆盖）。",
+    "sync": {
+      "encrypted": "本地加密",
+      "viewVersions": "查看云端版本",
+      "remoteFound": "云端有可用快照",
+      "remoteUnknown": "尚未查询云端",
+      "scope": "同步范围：供应商配置、外观偏好"
+    },
+    "versions": {
+      "title": "云端版本",
+      "subtitle": "恢复前请核对时间与内容",
+      "remotePath": "远端路径",
+      "latest": "最新版本 · 来自 {device} · 应用版本 {version}",
+      "unknown": "未知",
+      "restore": "恢复",
+      "empty": "远端暂无快照",
+      "note": "恢复前会创建本地备份，并要求确认同步口令。"
+    },
+    "restore": {
+      "title": "确认从云端恢复配置？",
+      "subtitle": "恢复前会创建本地备份",
+      "warningTitle": "将恢复的内容",
+      "warningBody": "服务商配置、外观偏好",
+      "snapshotAt": "云端版本：{time}",
+      "overwriteHint": "本地未同步修改可能被覆盖。",
+      "passphrase": "同步口令（加密口令）",
+      "passphrasePlaceholder": "请输入同步口令",
+      "passphraseHint": "默认使用已保存的同步口令；如云端快照由其它口令加密，请在此输入该口令。",
+      "confirm": "确认恢复",
+      "restoring": "恢复中…"
+    }
+  }
+}
