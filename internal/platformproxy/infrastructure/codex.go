@@ -223,7 +223,8 @@ func (m *CodexManager) applyCodexDesiredConfig(data []byte) ([]byte, error) {
 		"model_providers.portico.name":                 {Present: true, Raw: strconv.Quote(codexProviderKey)},
 		"model_providers.portico.base_url":             {Present: true, Raw: strconv.Quote(m.baseURL())},
 		"model_providers.portico.wire_api":             {Present: true, Raw: strconv.Quote(codexWireAPI)},
-		"model_providers.portico.requires_openai_auth": {Present: true, Raw: "false"},
+		// Codex 必须启用 OpenAI 认证，才会将 auth.json 中的占位密钥发给 relay。
+		"model_providers.portico.requires_openai_auth": {Present: true, Raw: "true"},
 	}
 	return applyCodexConfigValues(data, values)
 }
