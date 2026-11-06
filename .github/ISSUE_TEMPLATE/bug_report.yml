@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting! Please check [Common Debugging](https://github.com/blueshark0/Portico#development) first — relay 401s usually mean the platform proxy needs re-enabling.
+        Thanks for reporting! Please check [Troubleshooting](https://github.com/blueshark0/Portico#troubleshooting) first — relay 401s usually mean the platform proxy needs re-enabling.
   - type: input
     id: version
     attributes:
