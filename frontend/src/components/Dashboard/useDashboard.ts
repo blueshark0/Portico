@@ -12,6 +12,7 @@ import {
   type UpstreamStatus,
 } from '../../services/mcp'
 import { getErrorMessage } from '../../utils/errors'
+import { parseDateTime } from '../../utils/dateTime'
 import { showToast } from '../../utils/toast'
 import { useQuickSwitch } from '../../composables/useQuickSwitch'
 
@@ -139,8 +140,8 @@ export const useDashboard = () => {
       recentSessions.value = results
         .flatMap((r) => r.sessions)
         .sort((a, b) => {
-          const ta = new Date(a.lastSuccessAt as string).getTime() || 0
-          const tb = new Date(b.lastSuccessAt as string).getTime() || 0
+          const ta = parseDateTime(a.lastSuccessAt, { assumeUTC: true })?.getTime() ?? 0
+          const tb = parseDateTime(b.lastSuccessAt, { assumeUTC: true })?.getTime() ?? 0
           return tb - ta
         })
         .slice(0, 5)
