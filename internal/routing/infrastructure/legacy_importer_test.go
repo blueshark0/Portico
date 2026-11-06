@@ -130,6 +130,10 @@ func TestLegacyImporterEnsureImported_MigratesLegacyFiles(t *testing.T) {
 	if len(alpha.ModelMapping) != 1 || alpha.ModelMapping["claude-*"] != "alpha/claude-*" {
 		t.Fatalf("unexpected Alpha model mapping: %+v", alpha.ModelMapping)
 	}
+	if len(alpha.ModelMappingSchemes) != 1 || alpha.ModelMappingSchemes[0].Name != "默认方案" ||
+		alpha.ActiveModelMappingScheme != "默认方案" || alpha.ModelMappingSchemes[0].Mapping["claude-*"] != "alpha/claude-*" {
+		t.Fatalf("legacy mapping was not migrated to an active default scheme: %+v", alpha)
+	}
 
 	// 迁移语义锁定：旧 enabled 字段被丢弃，落库列保持默认 0。
 	var enabledCount int

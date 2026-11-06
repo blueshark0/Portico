@@ -138,3 +138,47 @@ func TestSQLiteStoreSaveProfilePersistsArchivedFlag(t *testing.T) {
 		t.Fatal("expected re-archiving to record a new timestamp")
 	}
 }
+
+func TestSQLiteStoreSaveProfilePersistsModelMappingSchemes(t *testing.T) {
+	dbName := "routing_test_" + t.Name()
+	dbPath := filepath.Join(t.TempDir(), "app.db")
+	openRoutingTestDB(t, dbName, dbPath)
+	store := NewSQLiteStoreWithDBName(dbName)
+	if err := store.EnsureSchema(); err != nil {
+		t.Fatalf("EnsureSchema: %v", err)
+	}
+
+	profile := domain.RouteProfile{
+		Platform:          kernel.PlatformClaude,
+		DefaultProviderID: intPtr(1),
+		Providers: []domain.Provider{{
+			ID: 1, Name: "alpha", APIURL: "https://alpha.example", Position: 1,
+			ModelMappingSchemes: []domain.ModelMappingScheme{
+				{Name: "Daily", Mapping: map[string]string{"claude-*": "vendor/claude-*"}},
+				{Name: "Deep", Mapping: map[string]string{"claude-sonnet-4-5": "vendor/opus"}},
+			},
+			ActiveModelMappingScheme: "Deep",
+		}},
+	}
+	saved, err := store.SaveProfile(context.Background(), profile)
+	if err != nil {
+		t.Fatalf("SaveProfile: %v", err)
+	}
+	if len(saved.Providers[0].ModelMappingSchemes) != 2 || saved.Providers[0].ModelMapping["claude-sonnet-4-5"] != "vendor/opus" {
+		t.Fatalf("scheme round trip failed: %+v", saved.Providers[0])
+	}
+
+	saved.Providers[0].ActiveModelMappingScheme = ""
+	saved.Providers[0].ModelMapping = map[string]string{"stale": "stale-target"}
+	if _, err := store.SaveProfile(context.Background(), saved); err != nil {
+		t.Fatalf("SaveProfile deactivated: %v", err)
+	}
+	loaded, err := store.GetProfile(context.Background(), kernel.PlatformClaude)
+	if err != nil {
+		t.Fatalf("GetProfile: %v", err)
+	}
+	provider := loaded.Providers[0]
+	if provider.ActiveModelMappingScheme != "" || len(provider.ModelMapping) != 0 || len(provider.ModelMappingSchemes) != 2 {
+		t.Fatalf("deactivated scheme persistence failed: %+v", provider)
+	}
+}

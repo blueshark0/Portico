@@ -275,7 +275,9 @@ func TestListRequestLogs_FastCostDoublesBaseCost(t *testing.T) {
 }
 
 func TestStatsSince_UsesAdaptiveBucketsForRange(t *testing.T) {
-	loc := time.FixedZone("UTC+8", 8*60*60)
+	// 分桶 SQL 使用 SQLite 的 'localtime'（进程时区），这里必须跟随 time.Local，
+	// 不能用固定 UTC+8，否则在 UTC 的 CI 上分桶会整体偏移。
+	loc := time.Local
 	now := time.Date(2026, time.March, 16, 12, 0, 0, 0, loc)
 	db := setupRangeQueryTestDB(t)
 	setRangeTestClock(t, now)

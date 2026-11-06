@@ -23,6 +23,24 @@ func (f *RoutingFacade) SaveProfile(profile routingdomain.RouteProfile) (routing
 	return f.service.SaveProfile(context.Background(), profile)
 }
 
+func (f *RoutingFacade) SaveModelMappingScheme(
+	platform string,
+	providerID int,
+	originalName string,
+	scheme routingdomain.ModelMappingScheme,
+	activate bool,
+) (routingdomain.RouteProfile, error) {
+	return f.service.SaveModelMappingScheme(context.Background(), platform, providerID, originalName, scheme, activate)
+}
+
+func (f *RoutingFacade) DeleteModelMappingScheme(platform string, providerID int, name string) (routingdomain.RouteProfile, error) {
+	return f.service.DeleteModelMappingScheme(context.Background(), platform, providerID, name)
+}
+
+func (f *RoutingFacade) SetActiveModelMappingScheme(platform string, providerID int, name string) (routingdomain.RouteProfile, error) {
+	return f.service.SetActiveModelMappingScheme(context.Background(), platform, providerID, name)
+}
+
 func (f *RoutingFacade) GetAppPreferences() (routingdomain.AppPreferences, error) {
 	return f.service.GetAppPreferences(context.Background())
 }

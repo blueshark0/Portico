@@ -13,6 +13,8 @@ export type MockProvider = {
   position: number
   supportedModels?: Record<string, boolean>
   modelMapping?: Record<string, string>
+  modelMappingSchemes?: { name: string; mapping: Record<string, string> }[]
+  activeModelMappingScheme?: string
 }
 
 export type MockProfile = {
@@ -92,6 +94,20 @@ export const mockProfiles: MockProfile[] = [
           'kimi-k2-thinking': false,
         },
         modelMapping: { 'claude-sonnet-4-5': 'kimi-k2-0905-preview' },
+        modelMappingSchemes: [
+          {
+            name: '日常编码',
+            mapping: { 'claude-sonnet-4-5': 'kimi-k2-0905-preview' },
+          },
+          {
+            name: '深度推理',
+            mapping: {
+              'claude-sonnet-4-5': 'kimi-k2-thinking',
+              'claude-opus-4-1': 'kimi-k2-thinking',
+            },
+          },
+        ],
+        activeModelMappingScheme: '日常编码',
       },
       {
         id: 2,

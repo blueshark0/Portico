@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseModal from '../common/BaseModal.vue'
 import BaseInput from '../common/BaseInput.vue'
 import ModelWhitelistEditor from '../common/ModelWhitelistEditor.vue'
-import ModelMappingEditor from '../common/ModelMappingEditor.vue'
+import SchemeSummary from '../ModelMapping/SchemeSummary.vue'
 import RequestBodyReplacementEditor from '../common/RequestBodyReplacementEditor.vue'
-import type { ProviderForm } from './useProviderDirectory'
+import { activeMappingOf, activeSchemeOf } from '../../utils/modelMapping'
+import type { DirectoryEntry, ProviderForm } from './useProviderDirectory'
 
 const props = defineProps<{
+  entry: DirectoryEntry | null
   state: {
     open: boolean
     entryKey: string
@@ -17,9 +20,17 @@ const props = defineProps<{
   }
 }>()
 
-const emit = defineEmits<{ (e: 'close'): void; (e: 'submit'): void }>()
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'submit'): void
+  (e: 'manageMapping'): void
+  (e: 'switchMapping'): void
+}>()
 
 const { t } = useI18n()
+const activeScheme = computed(() => activeSchemeOf(props.entry?.provider))
+const activeName = computed(() => activeScheme.value?.name || t('modelMapping.noMapping'))
+const activeRules = computed(() => activeMappingOf(props.entry?.provider))
 
 const setTab = (tab: 'connection' | 'body') => {
   props.state.tab = tab
@@ -99,8 +110,15 @@ const setTab = (tab: 'connection' | 'body') => {
           <ModelWhitelistEditor v-model="state.draft.supportedModels" />
         </section>
 
-        <section class="padv-section">
-          <ModelMappingEditor v-model="state.draft.modelMapping" />
+        <section v-if="entry" class="padv-section">
+          <SchemeSummary
+            :active-name="activeName"
+            :rules="activeRules"
+            :active="!!activeScheme"
+            :busy="state.saving"
+            @manage="emit('manageMapping')"
+            @switch="emit('switchMapping')"
+          />
         </section>
       </template>
 

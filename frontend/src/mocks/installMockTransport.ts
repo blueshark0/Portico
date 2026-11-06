@@ -93,6 +93,21 @@ const seriesOf = (logs: typeof mockRequestLogs) => {
     })
 }
 
+const mockProviderFor = (platform: string, providerID: number) => {
+  const profile = mockProfiles.find((item) => item.platform === platform)
+  const provider = profile?.providers.find((item) => item.id === providerID)
+  if (!profile || !provider) throw new Error('provider not found (demo)')
+  return { profile, provider }
+}
+
+const syncMockActiveMapping = (provider: any) => {
+  provider.modelMappingSchemes ??= []
+  const active = provider.modelMappingSchemes.find(
+    (scheme: any) => scheme.name === provider.activeModelMappingScheme,
+  )
+  provider.modelMapping = active ? clone(active.mapping) : {}
+}
+
 // methodID → handler；未知 ID 返回 null（与真实运行时「方法存在但零值」行为接近）。
 const handlers: Record<number, (...args: any[]) => any> = {
   // routingfacade
@@ -108,6 +123,47 @@ const handlers: Record<number, (...args: any[]) => any> = {
   1086826521: (profile: any) => {
     const index = mockProfiles.findIndex((p) => p.platform === profile.platform)
     if (index >= 0) mockProfiles[index] = clone(profile)
+    return clone(profile)
+  },
+  3025431918: (platform: string, providerID: number, originalName: string, scheme: any, activate: boolean) => {
+    const { profile, provider } = mockProviderFor(platform, providerID)
+    provider.modelMappingSchemes ??= []
+    const index = originalName
+      ? provider.modelMappingSchemes.findIndex((item: any) => item.name.toLowerCase() === originalName.toLowerCase())
+      : -1
+    if (originalName && index < 0) throw new Error('mapping scheme not found (demo)')
+    if (provider.modelMappingSchemes.some((item: any, itemIndex: number) =>
+      itemIndex !== index && item.name.toLowerCase() === scheme.name.trim().toLowerCase())) {
+      throw new Error('duplicate mapping scheme name (demo)')
+    }
+    const savedScheme = { name: scheme.name.trim(), mapping: clone(scheme.mapping ?? {}) }
+    if (index < 0) provider.modelMappingSchemes.push(savedScheme)
+    else {
+      if (provider.activeModelMappingScheme?.toLowerCase() === originalName.toLowerCase()) {
+        provider.activeModelMappingScheme = savedScheme.name
+      }
+      provider.modelMappingSchemes[index] = savedScheme
+    }
+    if (activate) provider.activeModelMappingScheme = savedScheme.name
+    syncMockActiveMapping(provider)
+    return clone(profile)
+  },
+  2625227036: (platform: string, providerID: number, name: string) => {
+    const { profile, provider } = mockProviderFor(platform, providerID)
+    const index = provider.modelMappingSchemes?.findIndex((item: any) => item.name === name) ?? -1
+    if (index < 0) throw new Error('mapping scheme not found (demo)')
+    if (provider.activeModelMappingScheme === name) throw new Error('active scheme cannot be deleted (demo)')
+    provider.modelMappingSchemes?.splice(index, 1)
+    syncMockActiveMapping(provider)
+    return clone(profile)
+  },
+  2640447551: (platform: string, providerID: number, name: string) => {
+    const { profile, provider } = mockProviderFor(platform, providerID)
+    if (name && !provider.modelMappingSchemes?.some((item: any) => item.name === name)) {
+      throw new Error('mapping scheme not found (demo)')
+    }
+    provider.activeModelMappingScheme = name
+    syncMockActiveMapping(provider)
     return clone(profile)
   },
   3032235800: async (provider: any) => {

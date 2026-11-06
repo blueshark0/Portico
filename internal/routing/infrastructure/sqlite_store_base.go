@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	legacyImportMetaKey = "routing.legacy_imported"
+	legacyImportMetaKey           = "routing.legacy_imported"
+	mappingSchemesMigratedMetaKey = "routing.model_mapping_schemes_migrated"
 )
 
 type SQLiteStore struct {
@@ -51,6 +52,8 @@ func (s *SQLiteStore) EnsureSchema() error {
 				position INTEGER NOT NULL,
 				supported_models_json TEXT NOT NULL DEFAULT '{}',
 				model_mapping_json TEXT NOT NULL DEFAULT '{}',
+				model_mapping_schemes_json TEXT NOT NULL DEFAULT '[]',
+				active_model_mapping_scheme TEXT NOT NULL DEFAULT '',
 				request_body_replacements_json TEXT NOT NULL DEFAULT '[]',
 				PRIMARY KEY(platform, id),
 				UNIQUE(platform, name)
@@ -78,6 +81,9 @@ func (s *SQLiteStore) EnsureSchema() error {
 		return err
 	}
 	if err := ensureProviderColumns(db); err != nil {
+		return err
+	}
+	if err := migrateModelMappingSchemes(db); err != nil {
 		return err
 	}
 	if _, err := db.Exec(`INSERT INTO app_preferences (id, show_heatmap, show_home_title, proxy_enabled, proxy_url)
@@ -110,6 +116,8 @@ func ensureProviderColumns(db *sql.DB) error {
 		{Name: "insecure_skip_verify", Definition: "INTEGER NOT NULL DEFAULT 0"},
 		{Name: "archived", Definition: "INTEGER NOT NULL DEFAULT 0"},
 		{Name: "archived_at", Definition: "DATETIME NULL"},
+		{Name: "model_mapping_schemes_json", Definition: "TEXT NOT NULL DEFAULT '[]'"},
+		{Name: "active_model_mapping_scheme", Definition: "TEXT NOT NULL DEFAULT ''"},
 	})
 }
 
