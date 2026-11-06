@@ -8,6 +8,7 @@ on:
 jobs:
   go-test:
     runs-on: ubuntu-latest
+    needs: frontend-build
     steps:
       - uses: actions/checkout@v4
 
@@ -20,6 +21,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+
+      # main.go 通过 //go:embed all:frontend/dist 嵌入前端产物，vet/test 前必须就位
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
 
       - name: go vet
         run: go vet ./...
@@ -68,3 +76,10 @@ jobs:
 
       - name: Type-check and build
         run: pnpm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 1
