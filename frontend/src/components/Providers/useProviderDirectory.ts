@@ -1,6 +1,11 @@
 import { computed, reactive, ref } from 'vue'
 import { providerTabIds, providerTabs, type ProviderTab } from '../../constants/platforms'
-import { fetchRouteProfile, saveRouteProfile, type RouteProfile } from '../../services/routing'
+import {
+  fetchRouteProfile,
+  saveRouteProfile,
+  type ModelMappingScheme,
+  type RouteProfile,
+} from '../../services/routing'
 import { testProviderConnection, type ProviderProbeResult } from '../../services/providers'
 import type { ProviderRecord } from '../../services/providers'
 import { getErrorMessage } from '../../utils/errors'
@@ -48,6 +53,8 @@ export type ProviderForm = {
   officialSite: string
   supportedModels: Record<string, boolean>
   modelMapping: Record<string, string>
+  modelMappingSchemes: ModelMappingScheme[]
+  activeModelMappingScheme: string
   requestBodyReplacements: { path: string; matchValue?: string; value: string }[]
   proxyMode: string
   proxyUrl: string
@@ -61,6 +68,8 @@ export const emptyProviderForm = (): ProviderForm => ({
   officialSite: '',
   supportedModels: {},
   modelMapping: {},
+  modelMappingSchemes: [],
+  activeModelMappingScheme: '',
   requestBodyReplacements: [],
   proxyMode: '',
   proxyUrl: '',
@@ -78,6 +87,13 @@ export const providerToForm = (provider: ProviderRecord): ProviderForm => ({
   modelMapping: Object.fromEntries(
     Object.entries(provider.modelMapping ?? {}).map(([key, value]) => [key, value ?? '']),
   ),
+  modelMappingSchemes: (provider.modelMappingSchemes ?? []).map((scheme) => ({
+    name: scheme.name,
+    mapping: Object.fromEntries(
+      Object.entries(scheme.mapping ?? {}).map(([key, value]) => [key, value ?? '']),
+    ),
+  })),
+  activeModelMappingScheme: provider.activeModelMappingScheme ?? '',
   requestBodyReplacements: (provider.requestBodyReplacements ?? []).map((r) => ({
     path: r.path,
     matchValue: r.matchValue,
@@ -94,6 +110,11 @@ export const formToProviderPatch = (form: ProviderForm) => ({
   officialSite: form.officialSite.trim(),
   supportedModels: { ...(form.supportedModels ?? {}) },
   modelMapping: { ...(form.modelMapping ?? {}) },
+  modelMappingSchemes: (form.modelMappingSchemes ?? []).map((scheme) => ({
+    name: scheme.name,
+    mapping: { ...(scheme.mapping ?? {}) },
+  })),
+  activeModelMappingScheme: form.activeModelMappingScheme ?? '',
   requestBodyReplacements: (form.requestBodyReplacements ?? [])
     .map((r) => ({
       path: r.path.trim(),
@@ -191,6 +212,22 @@ export const useProviderDirectory = (t: TranslateFn, view: ProviderDirectoryView
     } finally {
       loading.value = false
     }
+  }
+
+  const applyMappingProfile = (saved: RouteProfile) => {
+    const platform = saved.platform as ProviderTab
+    if (!providerTabIds.includes(platform)) return
+    profiles[platform] = saved
+
+    // 高级配置的其他字段可能仍在编辑，只同步映射相关字段。
+    const entry = findEntry(advancedState.entryKey)
+    if (!advancedState.open || !entry || entry.platform !== platform) return
+    const savedProvider = saved.providers.find((provider) => provider.id === entry.provider.id)
+    if (!savedProvider) return
+    const mappingForm = providerToForm(savedProvider)
+    advancedState.draft.modelMapping = mappingForm.modelMapping
+    advancedState.draft.modelMappingSchemes = mappingForm.modelMappingSchemes
+    advancedState.draft.activeModelMappingScheme = mappingForm.activeModelMappingScheme
   }
 
   // 单平台落库：position 统一重排，保持与旧实现一致。
@@ -566,6 +603,7 @@ export const useProviderDirectory = (t: TranslateFn, view: ProviderDirectoryView
     findEntry,
     isDefault,
     loadAll,
+    applyMappingProfile,
     openCreate,
     openEdit,
     submitEditor,

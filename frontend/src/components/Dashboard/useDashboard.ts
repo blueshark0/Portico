@@ -1,6 +1,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { providerTabs, type ProviderTab } from '../../constants/platforms'
-import { fetchRouteProfile } from '../../services/routing'
+import { fetchRouteProfile, type RouteProfile } from '../../services/routing'
 import { disableProxy, enableProxy, fetchProxyStatus } from '../../services/claudeSettings'
 import { fetchPlatformSessions, type SessionBinding } from '../../services/sessions'
 import {
@@ -20,6 +20,8 @@ export type DashboardClient = {
   label: string
   proxyEnabled: boolean
   providerName: string
+  providerId: number
+  activeMappingScheme: string
   model: string
 }
 
@@ -34,6 +36,16 @@ export type RecentSession = {
 const modelOf = (supported?: Partial<Record<string, boolean>>) => {
   const models = Object.keys(supported ?? {}).filter((key) => supported?.[key] !== false)
   return models[0] ?? ''
+}
+
+const providerFields = (profile: RouteProfile) => {
+  const current = profile?.providers?.find((provider) => provider.id === profile.defaultProviderId)
+  return {
+    providerName: current?.name ?? '',
+    providerId: current?.id ?? 0,
+    activeMappingScheme: current?.activeModelMappingScheme ?? '',
+    model: current ? modelOf(current.supportedModels) : '',
+  }
 }
 
 export const useDashboard = () => {
@@ -107,13 +119,11 @@ export const useDashboard = () => {
             fetchProxyStatus(tab.id),
             fetchPlatformSessions(tab.id),
           ])
-          const current = profile?.providers?.find((p) => p.id === profile.defaultProviderId)
           const clientRow: DashboardClient = {
             platform: tab.id,
             label: tab.label,
             proxyEnabled: Boolean(proxyStatus?.enabled),
-            providerName: current?.name ?? '',
-            model: current ? modelOf(current.supportedModels) : '',
+            ...providerFields(profile),
           }
           const sessions: RecentSession[] = (bindings ?? []).map((binding) => ({
             platform: tab.id,
@@ -145,20 +155,20 @@ export const useDashboard = () => {
     const nameModelByPlatform = new Map(
       providerTabs.map((tab, index) => {
         const profile = profiles[index]
-        const current = profile?.providers?.find((p) => p.id === profile.defaultProviderId)
-        return [
-          tab.id,
-          {
-            providerName: current?.name ?? '',
-            model: current ? modelOf(current.supportedModels) : '',
-          },
-        ] as const
+        return [tab.id, providerFields(profile)] as const
       }),
     )
     clients.value = clients.value.map((client) => ({
       ...client,
       ...(nameModelByPlatform.get(client.platform) ?? {}),
     }))
+  }
+
+  const applyMappingProfile = (profile: RouteProfile) => {
+    const platform = profile.platform as ProviderTab
+    clients.value = clients.value.map((client) =>
+      client.platform === platform ? { ...client, ...providerFields(profile) } : client,
+    )
   }
 
   const { profileRevision } = useQuickSwitch()
@@ -182,6 +192,7 @@ export const useDashboard = () => {
     loading,
     proxyBusy,
     toggleClientProxy,
+    applyMappingProfile,
     reload: load,
   }
 }

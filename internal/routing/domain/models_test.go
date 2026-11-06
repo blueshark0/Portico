@@ -267,3 +267,133 @@ func TestNormalizeRequestBodyReplacements(t *testing.T) {
 		t.Fatalf("expected conditional entry with trimmed match value, got %+v", normalized[1])
 	}
 }
+
+func TestRouteProfileNormalizeMigratesLegacyMappingToDefaultScheme(t *testing.T) {
+	legacy := map[string]string{"claude-*": "vendor/claude-*"}
+	profile := RouteProfile{
+		Platform: kernel.PlatformClaude,
+		Providers: []Provider{{
+			ID: 1, Name: "Alpha", Position: 1,
+			ModelMapping: legacy,
+		}},
+	}
+
+	normalized := profile.Normalize()
+	provider := normalized.Providers[0]
+	if len(provider.ModelMappingSchemes) != 1 {
+		t.Fatalf("expected one migrated scheme, got %+v", provider.ModelMappingSchemes)
+	}
+	scheme := provider.ModelMappingSchemes[0]
+	if scheme.Name != DefaultModelMappingSchemeName || provider.ActiveModelMappingScheme != DefaultModelMappingSchemeName {
+		t.Fatalf("expected active default scheme, got %+v", provider)
+	}
+	if got := provider.GetEffectiveModel("claude-sonnet-4-5"); got != "vendor/claude-sonnet-4-5" {
+		t.Fatalf("legacy wildcard mapping changed: %q", got)
+	}
+
+	scheme.Mapping["claude-*"] = "mutated/*"
+	if legacy["claude-*"] != "vendor/claude-*" {
+		t.Fatal("expected scheme mapping to be a deep copy")
+	}
+}
+
+func TestRouteProfileNormalizeMirrorsOnlyActiveScheme(t *testing.T) {
+	profile := RouteProfile{
+		Platform: kernel.PlatformClaude,
+		Providers: []Provider{{
+			ID: 1, Name: "Alpha", Position: 1,
+			SupportedModels: map[string]bool{"gpt-5": true},
+			ModelMappingSchemes: []ModelMappingScheme{
+				{Name: "Daily", Mapping: map[string]string{"claude-sonnet-4-5": "vendor/sonnet"}},
+				{Name: "Reasoning", Mapping: map[string]string{"claude-sonnet-4-5": "vendor/opus"}},
+			},
+			ActiveModelMappingScheme: "Reasoning",
+		}},
+	}
+
+	normalized := profile.Normalize()
+	provider := normalized.Providers[0]
+	if got := provider.GetEffectiveModel("claude-sonnet-4-5"); got != "vendor/opus" {
+		t.Fatalf("expected active scheme mapping, got %q", got)
+	}
+	if !provider.IsModelSupported("claude-sonnet-4-5") {
+		t.Fatal("active mapping key should be supported")
+	}
+
+	provider.ActiveModelMappingScheme = ""
+	provider.ModelMapping = map[string]string{"stale": "stale-target"}
+	deactivated := RouteProfile{Platform: profile.Platform, Providers: []Provider{provider}}.Normalize().Providers[0]
+	if got := deactivated.GetEffectiveModel("claude-sonnet-4-5"); got != "claude-sonnet-4-5" {
+		t.Fatalf("deactivated scheme must pass through, got %q", got)
+	}
+	if len(deactivated.ModelMapping) != 0 {
+		t.Fatalf("deactivated scheme must clear compatibility mirror, got %+v", deactivated.ModelMapping)
+	}
+	if deactivated.IsModelSupported("claude-sonnet-4-5") {
+		t.Fatal("inactive scheme must not make a request model supported")
+	}
+}
+
+func TestRouteProfileNormalizeDoesNotResurrectExplicitlyEmptySchemes(t *testing.T) {
+	profile := RouteProfile{
+		Platform: kernel.PlatformClaude,
+		Providers: []Provider{{
+			ID: 1, Name: "Alpha", Position: 1,
+			ModelMapping:        map[string]string{"claude-*": "legacy/*"},
+			ModelMappingSchemes: []ModelMappingScheme{},
+		}},
+	}
+
+	provider := profile.Normalize().Providers[0]
+	if len(provider.ModelMappingSchemes) != 0 || len(provider.ModelMapping) != 0 {
+		t.Fatalf("explicitly empty schemes must stay empty, got %+v", provider)
+	}
+}
+
+func TestRouteProfileValidateRejectsInvalidMappingSchemes(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider Provider
+		want     string
+	}{
+		{
+			name: "empty scheme name",
+			provider: Provider{ID: 1, Name: "Alpha", Position: 1, ModelMappingSchemes: []ModelMappingScheme{
+				{Name: " ", Mapping: map[string]string{}},
+			}},
+			want: "名称不能为空",
+		},
+		{
+			name: "case insensitive duplicate name",
+			provider: Provider{ID: 1, Name: "Alpha", Position: 1, ModelMappingSchemes: []ModelMappingScheme{
+				{Name: "Daily", Mapping: map[string]string{}},
+				{Name: "daily", Mapping: map[string]string{}},
+			}},
+			want: "名称重复",
+		},
+		{
+			name: "empty rule model",
+			provider: Provider{ID: 1, Name: "Alpha", Position: 1, ModelMappingSchemes: []ModelMappingScheme{
+				{Name: "Daily", Mapping: map[string]string{" ": "target"}},
+			}},
+			want: "空模型",
+		},
+		{
+			name: "dangling active scheme",
+			provider: Provider{ID: 1, Name: "Alpha", Position: 1,
+				ModelMappingSchemes:      []ModelMappingScheme{{Name: "Daily", Mapping: map[string]string{}}},
+				ActiveModelMappingScheme: "Missing",
+			},
+			want: "当前模型映射方案不存在",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := RouteProfile{Platform: kernel.PlatformClaude, Providers: []Provider{tt.provider}}
+			err := profile.Normalize().Validate()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("expected error containing %q, got %v", tt.want, err)
+			}
+		})
+	}
+}

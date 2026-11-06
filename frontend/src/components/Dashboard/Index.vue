@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { Sparkles, Command, ChevronRight } from 'lucide-vue-next'
+import { Sparkles, Command, ChevronDown, ChevronRight } from 'lucide-vue-next'
+import MappingSchemeSwitchModal from '../ModelMapping/SwitchModal.vue'
 import { useDashboard, type DashboardClient } from './useDashboard'
 import { useQuickSwitch } from '../../composables/useQuickSwitch'
 import { parseDateTime } from '../../utils/dateTime'
@@ -22,7 +24,9 @@ const {
   totalToolCount,
   proxyBusy,
   toggleClientProxy,
+  applyMappingProfile,
 } = useDashboard()
+const mappingClient = ref<DashboardClient | null>(null)
 
 const CLIENT_ICONS: Record<DashboardClient['platform'], string> = {
   claude: brandClaude,
@@ -99,6 +103,19 @@ const copyEndpoint = async () => {
           <p class="dash-client-label">{{ t('dashboard.clients.currentProvider') }}</p>
           <p class="dash-client-provider">{{ client.providerName || t('dashboard.clients.none') }}</p>
           <p class="dash-client-model cs-mono">{{ client.model || '—' }}</p>
+          <button
+            type="button"
+            class="dash-mapping-select"
+            :disabled="!client.providerId"
+            :title="client.providerId ? t('modelMapping.switchTitle') : t('modelMapping.providerMissing')"
+            @click="mappingClient = client"
+          >
+            <span class="dash-mapping-label">{{ t('modelMapping.label') }}</span>
+            <span class="dash-mapping-value">
+              {{ client.activeMappingScheme || t('modelMapping.noMapping') }}
+              <ChevronDown :size="12" :stroke-width="2" />
+            </span>
+          </button>
           <hr class="cs-divider" />
           <div class="dash-client-foot">
             <label class="dash-client-relay">
@@ -181,6 +198,16 @@ const copyEndpoint = async () => {
         </div>
       </div>
     </section>
+
+    <MappingSchemeSwitchModal
+      :open="!!mappingClient"
+      :platform="mappingClient?.platform ?? ''"
+      :provider-id="mappingClient?.providerId ?? 0"
+      :platform-label="mappingClient?.label ?? ''"
+      :provider-name="mappingClient?.providerName ?? ''"
+      @close="mappingClient = null"
+      @updated="applyMappingProfile"
+    />
   </div>
 </template>
 
@@ -303,6 +330,56 @@ const copyEndpoint = async () => {
   margin: 8px 0 12px;
   font-size: 11px;
   color: var(--cs-text-secondary);
+}
+
+.dash-mapping-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 39px;
+  margin: 0 0 12px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--cs-canvas);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dash-mapping-select:hover:not(:disabled) {
+  background: var(--cs-brand-tint);
+}
+
+.dash-mapping-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.dash-mapping-label {
+  flex-shrink: 0;
+  color: var(--cs-text-secondary);
+  font-size: 11px;
+  line-height: 17px;
+}
+
+.dash-mapping-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--cs-brand);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 19px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-mapping-value :deep(svg) {
+  flex-shrink: 0;
 }
 
 .dash-client-switch {

@@ -165,3 +165,63 @@ func TestSQLiteStoreEnsureSchema_MigratesLegacyProviderColumns(t *testing.T) {
 		t.Fatalf("expected legacy archived timestamp to remain unknown, got %v", profile.Providers[0].ArchivedAt)
 	}
 }
+
+func TestSQLiteStoreEnsureSchema_MigratesModelMappingSchemesOnce(t *testing.T) {
+	dbName := "routing_test_" + t.Name()
+	dbPath := filepath.Join(t.TempDir(), "app.db")
+	db := openRoutingTestDB(t, dbName, dbPath)
+
+	if _, err := db.Exec(`
+		CREATE TABLE providers (
+			platform TEXT NOT NULL,
+			id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			api_url TEXT NOT NULL DEFAULT '',
+			api_key TEXT NOT NULL DEFAULT '',
+			official_site TEXT NOT NULL DEFAULT '',
+			tint TEXT NOT NULL DEFAULT '',
+			accent TEXT NOT NULL DEFAULT '',
+			enabled INTEGER NOT NULL DEFAULT 0,
+			position INTEGER NOT NULL,
+			supported_models_json TEXT NOT NULL DEFAULT '{}',
+			model_mapping_json TEXT NOT NULL DEFAULT '{}',
+			PRIMARY KEY(platform, id),
+			UNIQUE(platform, name)
+		);
+		INSERT INTO providers(platform, id, name, position, model_mapping_json)
+		VALUES ('claude', 1, 'legacy', 1, '{"claude-*":"vendor/claude-*"}');
+	`); err != nil {
+		t.Fatalf("seed legacy model mapping: %v", err)
+	}
+
+	store := NewSQLiteStoreWithDBName(dbName)
+	if err := store.EnsureSchema(); err != nil {
+		t.Fatalf("EnsureSchema: %v", err)
+	}
+	profile, err := store.GetProfile(context.Background(), "claude")
+	if err != nil {
+		t.Fatalf("GetProfile after migration: %v", err)
+	}
+	provider := profile.Providers[0]
+	if len(provider.ModelMappingSchemes) != 1 || provider.ModelMappingSchemes[0].Name != "默认方案" ||
+		provider.ActiveModelMappingScheme != "默认方案" || provider.ModelMapping["claude-*"] != "vendor/claude-*" {
+		t.Fatalf("unexpected migrated mapping schemes: %+v", provider)
+	}
+
+	// Simulate deleting every scheme. Reopening the store must not backfill the
+	// compatibility mirror again after the one-time migration has completed.
+	if _, err := db.Exec(`UPDATE providers SET model_mapping_schemes_json = '[]',
+		active_model_mapping_scheme = '', model_mapping_json = '{}' WHERE platform = 'claude' AND id = 1`); err != nil {
+		t.Fatalf("clear migrated schemes: %v", err)
+	}
+	if err := store.EnsureSchema(); err != nil {
+		t.Fatalf("second EnsureSchema: %v", err)
+	}
+	profile, err = store.GetProfile(context.Background(), "claude")
+	if err != nil {
+		t.Fatalf("GetProfile after second migration: %v", err)
+	}
+	if len(profile.Providers[0].ModelMappingSchemes) != 0 || profile.Providers[0].ActiveModelMappingScheme != "" {
+		t.Fatalf("deleted schemes were resurrected: %+v", profile.Providers[0])
+	}
+}

@@ -49,20 +49,29 @@ const (
 	ProxyModeDirect  = "direct"
 )
 
+const DefaultModelMappingSchemeName = "默认方案"
+
+type ModelMappingScheme struct {
+	Name    string            `json:"name"`
+	Mapping map[string]string `json:"mapping"`
+}
+
 type Provider struct {
-	ID                      int                      `json:"id"`
-	Name                    string                   `json:"name"`
-	APIURL                  string                   `json:"apiUrl"`
-	APIKey                  string                   `json:"apiKey"`
-	OfficialSite            string                   `json:"officialSite"`
-	Tint                    string                   `json:"tint"`
-	Accent                  string                   `json:"accent"`
-	Position                int                      `json:"position"`
-	SupportedModels         map[string]bool          `json:"supportedModels,omitempty"`
-	ModelMapping            map[string]string        `json:"modelMapping,omitempty"`
-	RequestBodyReplacements []RequestBodyReplacement `json:"requestBodyReplacements,omitempty"`
-	ProxyMode               string                   `json:"proxyMode,omitempty"`
-	ProxyURL                string                   `json:"proxyUrl,omitempty"`
+	ID                       int                      `json:"id"`
+	Name                     string                   `json:"name"`
+	APIURL                   string                   `json:"apiUrl"`
+	APIKey                   string                   `json:"apiKey"`
+	OfficialSite             string                   `json:"officialSite"`
+	Tint                     string                   `json:"tint"`
+	Accent                   string                   `json:"accent"`
+	Position                 int                      `json:"position"`
+	SupportedModels          map[string]bool          `json:"supportedModels,omitempty"`
+	ModelMapping             map[string]string        `json:"modelMapping,omitempty"`
+	ModelMappingSchemes      []ModelMappingScheme     `json:"modelMappingSchemes,omitempty"`
+	ActiveModelMappingScheme string                   `json:"activeModelMappingScheme,omitempty"`
+	RequestBodyReplacements  []RequestBodyReplacement `json:"requestBodyReplacements,omitempty"`
+	ProxyMode                string                   `json:"proxyMode,omitempty"`
+	ProxyURL                 string                   `json:"proxyUrl,omitempty"`
 	// InsecureSkipVerify 显式跳过该供应商上游 TLS 证书校验（如本地抓包代理
 	// 调试）。默认 false：配置代理不再隐式关闭全局证书校验。
 	InsecureSkipVerify bool `json:"insecureSkipVerify,omitempty"`
@@ -123,12 +132,8 @@ func (p RouteProfile) Normalize() RouteProfile {
 			archivedAt := next.ArchivedAt.UTC()
 			next.ArchivedAt = &archivedAt
 		}
-		if next.SupportedModels == nil {
-			next.SupportedModels = map[string]bool{}
-		}
-		if next.ModelMapping == nil {
-			next.ModelMapping = map[string]string{}
-		}
+		next.SupportedModels = cloneBoolMap(next.SupportedModels)
+		normalizeModelMappingSchemes(&next)
 		next.RequestBodyReplacements = normalizeRequestBodyReplacements(next.RequestBodyReplacements)
 		cloned.Providers = append(cloned.Providers, next)
 	}
@@ -146,6 +151,60 @@ func (p RouteProfile) Normalize() RouteProfile {
 		cloned.Providers[idx].Position = idx + 1
 	}
 	return cloned
+}
+
+func cloneBoolMap(input map[string]bool) map[string]bool {
+	cloned := make(map[string]bool, len(input))
+	for key, value := range input {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func cloneModelMapping(input map[string]string) map[string]string {
+	cloned := make(map[string]string, len(input))
+	for key, value := range input {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+// normalizeModelMappingSchemes keeps ModelMapping as the compatibility mirror of
+// the active scheme. A nil scheme slice denotes a legacy profile; an explicitly
+// empty slice must stay empty so deleted schemes are never resurrected.
+func normalizeModelMappingSchemes(provider *Provider) {
+	if provider.ModelMappingSchemes == nil {
+		provider.ModelMappingSchemes = []ModelMappingScheme{}
+		if len(provider.ModelMapping) > 0 {
+			provider.ModelMappingSchemes = append(provider.ModelMappingSchemes, ModelMappingScheme{
+				Name:    DefaultModelMappingSchemeName,
+				Mapping: cloneModelMapping(provider.ModelMapping),
+			})
+			if strings.TrimSpace(provider.ActiveModelMappingScheme) == "" {
+				provider.ActiveModelMappingScheme = DefaultModelMappingSchemeName
+			}
+		}
+	} else {
+		schemes := make([]ModelMappingScheme, 0, len(provider.ModelMappingSchemes))
+		for _, scheme := range provider.ModelMappingSchemes {
+			scheme.Name = strings.TrimSpace(scheme.Name)
+			scheme.Mapping = cloneModelMapping(scheme.Mapping)
+			schemes = append(schemes, scheme)
+		}
+		provider.ModelMappingSchemes = schemes
+	}
+
+	provider.ActiveModelMappingScheme = strings.TrimSpace(provider.ActiveModelMappingScheme)
+	provider.ModelMapping = map[string]string{}
+	if provider.ActiveModelMappingScheme == "" {
+		return
+	}
+	for _, scheme := range provider.ModelMappingSchemes {
+		if scheme.Name == provider.ActiveModelMappingScheme {
+			provider.ModelMapping = cloneModelMapping(scheme.Mapping)
+			return
+		}
+	}
 }
 
 func normalizeRequestBodyReplacements(input []RequestBodyReplacement) []RequestBodyReplacement {
@@ -322,6 +381,39 @@ func wildcardMoreSpecific(a, b string) bool {
 
 func (p *Provider) ValidateConfiguration() []string {
 	errors := make([]string, 0)
+	seenSchemes := make(map[string]struct{}, len(p.ModelMappingSchemes))
+	activeSchemeFound := p.ActiveModelMappingScheme == ""
+	for _, scheme := range p.ModelMappingSchemes {
+		name := strings.TrimSpace(scheme.Name)
+		if name == "" {
+			errors = append(errors, "模型映射方案名称不能为空")
+		} else {
+			foldedName := strings.ToLower(name)
+			if _, exists := seenSchemes[foldedName]; exists {
+				errors = append(errors, fmt.Sprintf("模型映射方案名称重复：%s", name))
+			}
+			seenSchemes[foldedName] = struct{}{}
+		}
+		if name == p.ActiveModelMappingScheme {
+			activeSchemeFound = true
+		}
+		seenRules := make(map[string]struct{}, len(scheme.Mapping))
+		for requestModel, targetModel := range scheme.Mapping {
+			requestModel = strings.TrimSpace(requestModel)
+			targetModel = strings.TrimSpace(targetModel)
+			if requestModel == "" || targetModel == "" {
+				errors = append(errors, fmt.Sprintf("模型映射方案 %s 存在空模型", name))
+				continue
+			}
+			if _, exists := seenRules[requestModel]; exists {
+				errors = append(errors, fmt.Sprintf("模型映射方案 %s 的请求模型重复：%s", name, requestModel))
+			}
+			seenRules[requestModel] = struct{}{}
+		}
+	}
+	if !activeSchemeFound {
+		errors = append(errors, fmt.Sprintf("当前模型映射方案不存在：%s", p.ActiveModelMappingScheme))
+	}
 	if p.ModelMapping != nil && len(p.ModelMapping) > 0 &&
 		p.SupportedModels != nil && len(p.SupportedModels) > 0 {
 		for externalModel, internalModel := range p.ModelMapping {

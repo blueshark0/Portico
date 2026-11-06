@@ -29,7 +29,7 @@ func (s *SQLiteStore) GetProfile(ctx context.Context, platform kernel.Platform) 
 	}
 
 	rows, err := db.QueryContext(ctx, `SELECT id, name, api_url, api_key, official_site, tint, accent,
-		position, supported_models_json, model_mapping_json, request_body_replacements_json, proxy_mode, proxy_url, insecure_skip_verify, archived, archived_at
+		position, supported_models_json, model_mapping_json, model_mapping_schemes_json, active_model_mapping_scheme, request_body_replacements_json, proxy_mode, proxy_url, insecure_skip_verify, archived, archived_at
 		FROM providers
 		WHERE platform = ?
 		ORDER BY position ASC, id ASC`, platform.String())
@@ -42,6 +42,7 @@ func (s *SQLiteStore) GetProfile(ctx context.Context, platform kernel.Platform) 
 		var provider domain.Provider
 		var supportedModelsJSON string
 		var modelMappingJSON string
+		var modelMappingSchemesJSON string
 		var requestBodyReplacementsJSON string
 		var insecureSkipVerify int
 		var archived int
@@ -57,6 +58,8 @@ func (s *SQLiteStore) GetProfile(ctx context.Context, platform kernel.Platform) 
 			&provider.Position,
 			&supportedModelsJSON,
 			&modelMappingJSON,
+			&modelMappingSchemesJSON,
+			&provider.ActiveModelMappingScheme,
 			&requestBodyReplacementsJSON,
 			&provider.ProxyMode,
 			&provider.ProxyURL,
@@ -74,10 +77,14 @@ func (s *SQLiteStore) GetProfile(ctx context.Context, platform kernel.Platform) 
 		}
 		provider.SupportedModels = map[string]bool{}
 		provider.ModelMapping = map[string]string{}
+		provider.ModelMappingSchemes = []domain.ModelMappingScheme{}
 		if err := decodeJSONMap(supportedModelsJSON, &provider.SupportedModels); err != nil {
 			return domain.RouteProfile{}, err
 		}
 		if err := decodeJSONMap(modelMappingJSON, &provider.ModelMapping); err != nil {
+			return domain.RouteProfile{}, err
+		}
+		if err := decodeJSONMap(modelMappingSchemesJSON, &provider.ModelMappingSchemes); err != nil {
 			return domain.RouteProfile{}, err
 		}
 		if err := decodeJSONMap(requestBodyReplacementsJSON, &provider.RequestBodyReplacements); err != nil {
@@ -152,6 +159,7 @@ func (s *SQLiteStore) ReplaceAll(ctx context.Context, preferences domain.AppPref
 }
 
 func saveProfileTx(ctx context.Context, tx *sql.Tx, profile domain.RouteProfile) error {
+	profile = profile.Normalize()
 	var defaultProviderID any
 	if profile.DefaultProviderID != nil {
 		defaultProviderID = *profile.DefaultProviderID
@@ -189,6 +197,10 @@ func saveProfileTx(ctx context.Context, tx *sql.Tx, profile domain.RouteProfile)
 		if err != nil {
 			return err
 		}
+		modelMappingSchemesJSON, err := encodeJSONMap(provider.ModelMappingSchemes)
+		if err != nil {
+			return err
+		}
 		requestBodyReplacementsJSON, err := encodeJSONMap(provider.RequestBodyReplacements)
 		if err != nil {
 			return err
@@ -199,8 +211,8 @@ func saveProfileTx(ctx context.Context, tx *sql.Tx, profile domain.RouteProfile)
 		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO providers(
 			platform, id, name, api_url, api_key, official_site, tint, accent, position,
-			supported_models_json, model_mapping_json, request_body_replacements_json, proxy_mode, proxy_url, insecure_skip_verify, archived, archived_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			supported_models_json, model_mapping_json, model_mapping_schemes_json, active_model_mapping_scheme, request_body_replacements_json, proxy_mode, proxy_url, insecure_skip_verify, archived, archived_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(platform, id) DO UPDATE SET
 			name = excluded.name,
 			api_url = excluded.api_url,
@@ -211,6 +223,8 @@ func saveProfileTx(ctx context.Context, tx *sql.Tx, profile domain.RouteProfile)
 			position = excluded.position,
 			supported_models_json = excluded.supported_models_json,
 			model_mapping_json = excluded.model_mapping_json,
+			model_mapping_schemes_json = excluded.model_mapping_schemes_json,
+			active_model_mapping_scheme = excluded.active_model_mapping_scheme,
 			request_body_replacements_json = excluded.request_body_replacements_json,
 			proxy_mode = excluded.proxy_mode,
 			proxy_url = excluded.proxy_url,
@@ -232,6 +246,8 @@ func saveProfileTx(ctx context.Context, tx *sql.Tx, profile domain.RouteProfile)
 			provider.Position,
 			supportedModelsJSON,
 			modelMappingJSON,
+			modelMappingSchemesJSON,
+			provider.ActiveModelMappingScheme,
 			requestBodyReplacementsJSON,
 			provider.ProxyMode,
 			provider.ProxyURL,

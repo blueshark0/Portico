@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Archive, Copy, Ellipsis, Pencil, Plus, Settings2, Trash2 } from 'lucide-vue-next'
 import { providerTabs, type ProviderTab } from '../../constants/platforms'
 import {
@@ -16,9 +16,12 @@ import ProviderAdvancedModal from './ProviderAdvancedModal.vue'
 import ProviderDeleteModal from './ProviderDeleteModal.vue'
 import ProviderCopyModal from './ProviderCopyModal.vue'
 import ProviderArchiveModal from './ProviderArchiveModal.vue'
+import MappingSchemeSwitchModal from '../ModelMapping/SwitchModal.vue'
+import { mappingManagerPath } from '../../utils/modelMapping'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const directory = useProviderDirectory(t)
 const {
   filter,
@@ -112,6 +115,17 @@ const deleteTarget = computed(() =>
 const archiveTarget = computed(() =>
   archiveState.entryKey ? directory.findEntry(archiveState.entryKey) : null,
 )
+
+const advancedTarget = computed(() =>
+  advancedState.entryKey ? directory.findEntry(advancedState.entryKey) : null,
+)
+const mappingSwitchOpen = ref(false)
+const manageMapping = () => {
+  if (!advancedTarget.value) return
+  advancedState.open = false
+  mappingSwitchOpen.value = false
+  void router.push(mappingManagerPath(advancedTarget.value.platform, advancedTarget.value.provider.id))
+}
 </script>
 
 <template>
@@ -266,8 +280,21 @@ const archiveTarget = computed(() =>
     />
     <ProviderAdvancedModal
       :state="advancedState"
+      :entry="advancedTarget"
       @close="advancedState.open = false"
       @submit="directory.submitAdvanced"
+      @manage-mapping="manageMapping"
+      @switch-mapping="mappingSwitchOpen = true"
+    />
+    <MappingSchemeSwitchModal
+      :open="mappingSwitchOpen && !!advancedTarget"
+      :platform="advancedTarget?.platform ?? ''"
+      :provider-id="advancedTarget?.provider.id ?? 0"
+      :platform-label="advancedTarget?.platformLabel ?? ''"
+      :provider-name="advancedTarget?.provider.name ?? ''"
+      :return-label="t('common.close')"
+      @close="mappingSwitchOpen = false"
+      @updated="directory.applyMappingProfile"
     />
     <ProviderDeleteModal
       :open="deleteState.open"

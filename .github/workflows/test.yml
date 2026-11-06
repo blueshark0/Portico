@@ -17,10 +17,28 @@ jobs:
           go-version: '1.26.10'
           cache: true
 
+      - name: Prepare apt cache directory
+        run: sudo chown -R runner:runner /var/cache/apt/archives
+
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-${{ runner.os }}-gtk4-webkit6-${{ hashFiles('.github/workflows/test.yml') }}
+          restore-keys: |
+            apt-${{ runner.os }}-gtk4-webkit6-
+
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+          sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
+
+      # main.go 通过 //go:embed all:frontend/dist 嵌入前端产物，vet/test 前必须就位
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
 
       # main.go 通过 //go:embed all:frontend/dist 嵌入前端产物，vet/test 前必须就位
       - name: Download frontend dist
@@ -49,10 +67,21 @@ jobs:
           go-version: '1.26.10'
           cache: true
 
+      - name: Prepare apt cache directory
+        run: sudo chown -R runner:runner /var/cache/apt/archives
+
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-${{ runner.os }}-gtk4-webkit6-${{ hashFiles('.github/workflows/test.yml') }}
+          restore-keys: |
+            apt-${{ runner.os }}-gtk4-webkit6-
+
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+          sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0

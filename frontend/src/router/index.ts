@@ -8,6 +8,21 @@ const routes = [
     component: () => import('../components/Providers/Archived.vue'),
     meta: { nav: 'providers', crumb: 'providerArchive', crumbOnly: true },
   },
+  {
+    path: '/providers/:platform/:providerId/mapping',
+    component: () => import('../components/Providers/MappingSchemeManager.vue'),
+    meta: { nav: 'providers', crumb: 'modelMapping' },
+  },
+  {
+    path: '/providers/:platform/:providerId/mapping/new',
+    component: () => import('../components/Providers/MappingSchemeEditor.vue'),
+    meta: { nav: 'providers', crumb: 'modelMapping' },
+  },
+  {
+    path: '/providers/:platform/:providerId/mapping/edit',
+    component: () => import('../components/Providers/MappingSchemeEditor.vue'),
+    meta: { nav: 'providers', crumb: 'modelMapping' },
+  },
   { path: '/logs', component: () => import('../components/Logs/Index.vue'), meta: { nav: 'logs' } },
   { path: '/logs/session', component: () => import('../components/Logs/SessionTrace.vue'), meta: { nav: 'logs' } },
   { path: '/sessions', component: () => import('../components/Session/Index.vue'), meta: { nav: 'sessions' } },
