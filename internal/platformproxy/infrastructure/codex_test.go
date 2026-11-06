@@ -20,7 +20,7 @@ model_provider = "openai"
 name = "old-name"
 base_url = "http://old"
 wire_api = "chat"
-requires_openai_auth = true
+requires_openai_auth = false
 custom = "keep"
 
 [model_providers.other]
@@ -44,7 +44,7 @@ url = "http://mcp"
 		{`name = "old-name"`, `name = "portico"`},
 		{`base_url = "http://old"`, `base_url = "http://127.0.0.1:18100"`},
 		{`wire_api = "chat"`, `wire_api = "responses"`},
-		{`requires_openai_auth = true`, `requires_openai_auth = false`},
+		{`requires_openai_auth = false`, `requires_openai_auth = true`},
 	} {
 		expectedEnabled = strings.Replace(expectedEnabled, replacement[0], replacement[1], 1)
 	}
@@ -71,7 +71,7 @@ url = "http://mcp"
 		{`name = "portico"`, `name = "old-name"`},
 		{`base_url = "http://127.0.0.1:18100"`, `base_url = "http://old"`},
 		{`wire_api = "responses"`, `wire_api = "chat"`},
-		{`requires_openai_auth = false`, `requires_openai_auth = true`},
+		{`requires_openai_auth = true`, `requires_openai_auth = false`},
 	} {
 		expectedRestored = strings.Replace(expectedRestored, replacement[0], replacement[1], 1)
 	}
@@ -156,7 +156,7 @@ func TestCodexLegacyDisableLeavesBothFilesAndBackupsUntouched(t *testing.T) {
 	m := newCodexManager(t)
 	configPath := codexConfigPath(t)
 	authPath := codexAuthPathForTest(t)
-	config := []byte("model_provider = \"portico\"\n[model_providers.portico]\nname = \"portico\"\nbase_url = \"http://127.0.0.1:18100\"\nwire_api = \"responses\"\nrequires_openai_auth = false\n")
+	config := []byte("model_provider = \"portico\"\n[model_providers.portico]\nname = \"portico\"\nbase_url = \"http://127.0.0.1:18100\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n")
 	auth := []byte(`{"OPENAI_API_KEY":"portico","keep":1}`)
 	writeTestConfig(t, configPath, config)
 	writeTestConfig(t, authPath, auth)
