@@ -2,7 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchSessionRequestLogs } from '../../services/sessions'
 import type { RequestLog } from '../../services/logs'
-import { formatBeijingDateTime } from '../../utils/dateTime'
+import { formatLocalDateTime } from '../../utils/dateTime'
 
 export type SessionTraceRange = 'day' | 'full'
 export type SessionTraceStatus = 'all' | 'success' | 'failed'
@@ -20,7 +20,7 @@ export type SessionTraceMetrics = {
 }
 
 const queryValue = (value: unknown) => Array.isArray(value) ? String(value[0] ?? '') : String(value ?? '')
-export const requestDayKey = (log?: RequestLog | null) => log ? formatBeijingDateTime(log.created_at).slice(0, 10) : ''
+export const requestDayKey = (log?: RequestLog | null) => log ? formatLocalDateTime(log.created_at).slice(0, 10) : ''
 
 export const summarizeSessionLogs = (logs: RequestLog[]): SessionTraceMetrics => {
   const summary: SessionTraceMetrics = {

@@ -46,8 +46,8 @@ const loadSessions = async () => {
       }),
     )
     rows.value = collected.sort((a, b) => {
-      const ta = parseDateTime(a.last_success_at)?.getTime() ?? 0
-      const tb = parseDateTime(b.last_success_at)?.getTime() ?? 0
+      const ta = parseDateTime(a.last_success_at, { assumeUTC: true })?.getTime() ?? 0
+      const tb = parseDateTime(b.last_success_at, { assumeUTC: true })?.getTime() ?? 0
       return tb - ta
     })
   } catch (error) {
@@ -75,7 +75,7 @@ const switchFilter = (id: 'all' | ProviderTab) => {
 }
 
 const formatTime = (value: unknown) => {
-  const date = parseDateTime(value)
+  const date = parseDateTime(value, { assumeUTC: true })
   if (!date) return t('sessionsPage.dateUnknown')
   const diffMinutes = Math.floor((Date.now() - date.getTime()) / 60000)
   if (diffMinutes < 1) return t('sessionsPage.justNow')

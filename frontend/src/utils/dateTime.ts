@@ -1,9 +1,14 @@
 const BACKEND_DATE_PATTERN =
   /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) ([+-]\d{4}) UTC$/
+const UNZONED_TIMESTAMP_PATTERN =
+  /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?$/
 
 export const padDatePart = (num: number) => num.toString().padStart(2, '0')
 
-export const parseDateTime = (value?: unknown): Date | null => {
+export const parseDateTime = (
+  value?: unknown,
+  { assumeUTC = false }: { assumeUTC?: boolean } = {},
+): Date | null => {
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value
   }
@@ -18,6 +23,11 @@ export const parseDateTime = (value?: unknown): Date | null => {
   }
 
   const normalized = raw.replace(' ', 'T')
+  // Request timestamps without an offset are stored as UTC; chart buckets are local.
+  if (assumeUTC && UNZONED_TIMESTAMP_PATTERN.test(raw)) {
+    const parsed = new Date(`${normalized}Z`)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
   const attempts = [raw, normalized, `${normalized}Z`]
 
   for (const candidate of attempts) {
@@ -42,31 +52,12 @@ export const formatDateTime = (date: Date) => {
   return `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())} ${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}:${padDatePart(date.getSeconds())}`
 }
 
-const BEIJING_TIME_ZONE = 'Asia/Shanghai'
-
-const beijingDateTimeFormat = new Intl.DateTimeFormat('zh-CN', {
-  timeZone: BEIJING_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hourCycle: 'h23',
-})
-
-export const formatBeijingDateTime = (value?: unknown): string => {
-  const date = parseDateTime(value)
+export const formatLocalDateTime = (value?: unknown): string => {
+  const date = parseDateTime(value, { assumeUTC: true })
   if (!date) {
     return typeof value === 'string' ? value : ''
   }
-  const parts: Record<string, string> = {}
-  for (const part of beijingDateTimeFormat.formatToParts(date)) {
-    if (part.type !== 'literal') {
-      parts[part.type] = part.value
-    }
-  }
-  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`
+  return formatDateTime(date)
 }
 
 export const formatHourBucketLabel = (value?: string) => {

@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ChevronRight } from 'lucide-vue-next'
 import { providerTabs } from '../../constants/platforms'
-import { formatBeijingDateTime } from '../../utils/dateTime'
+import { formatLocalDateTime } from '../../utils/dateTime'
 import { formatUsdPrecise } from '../../utils/currency'
 import { useSessionTrace } from './useSessionTrace'
 
@@ -32,8 +32,8 @@ const {
 } = useSessionTrace()
 
 const platformLabel = computed(() => providerTabs.find((tab) => tab.id === platform.value)?.label ?? platform.value)
-const fullTime = (value?: string) => value ? formatBeijingDateTime(value).replaceAll('-', '/') : '—'
-const timelineTime = (value: string) => formatBeijingDateTime(value).slice(5).replace('-', '/')
+const fullTime = (value?: string) => value ? formatLocalDateTime(value).replaceAll('-', '/') : '—'
+const timelineTime = (value: string) => formatLocalDateTime(value).slice(5).replace('-', '/')
 const shortDay = (day: string) => day ? day.slice(5).replace('-', '/') : '—'
 const successRate = computed(() => scopeMetrics.value.requests > 0 ? scopeMetrics.value.successful / scopeMetrics.value.requests * 100 : null)
 const failureRate = computed(() => scopeMetrics.value.requests > 0 ? scopeMetrics.value.failed / scopeMetrics.value.requests * 100 : null)
@@ -72,8 +72,8 @@ const metrics = computed(() => [
   },
 ])
 
-const coverageStart = computed(() => shortDay(oldestRequest.value ? formatBeijingDateTime(oldestRequest.value.created_at).slice(0, 10) : ''))
-const coverageEnd = computed(() => shortDay(latestRequest.value ? formatBeijingDateTime(latestRequest.value.created_at).slice(0, 10) : ''))
+const coverageStart = computed(() => shortDay(oldestRequest.value ? formatLocalDateTime(oldestRequest.value.created_at).slice(0, 10) : ''))
+const coverageEnd = computed(() => shortDay(latestRequest.value ? formatLocalDateTime(latestRequest.value.created_at).slice(0, 10) : ''))
 const rangeSummary = computed(() => {
   if (range.value === 'day') {
     return t('sessionTrace.range.daySummary', { date: shortDay(referenceDay.value), count: scopeMetrics.value.requests })

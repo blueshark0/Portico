@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { providerTabs } from '../../constants/platforms'
-import { formatBeijingDateTime } from '../../utils/dateTime'
+import { formatLocalDateTime } from '../../utils/dateTime'
 import { formatUsdPrecise } from '../../utils/currency'
 import type { LogCostTier, RequestLog } from '../../services/logs'
 import { useLogsDashboard } from './useLogsDashboard'
@@ -67,7 +67,7 @@ const summaryMetrics = computed(() => {
 })
 
 const platformLabel = (platform: string) => providerTabs.find((tab) => tab.id === platform)?.label ?? platform
-const formatTime = (value: string) => formatBeijingDateTime(value)
+const formatTime = (value: string) => formatLocalDateTime(value)
 const formatDuration = (value: number) => value > 0 ? `${value >= 10 ? value.toFixed(1) : value.toFixed(2)} s` : '—'
 const formatCost = (log: RequestLog) => log.has_pricing ? formatUsdPrecise(log.total_cost) : '—'
 const isSuccess = (log: RequestLog) => log.http_code >= 200 && log.http_code < 300

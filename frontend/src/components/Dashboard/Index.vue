@@ -35,7 +35,7 @@ const CLIENT_ICONS: Record<DashboardClient['platform'], string> = {
 }
 
 const formatSessionTime = (value: unknown) => {
-  const date = parseDateTime(value)
+  const date = parseDateTime(value, { assumeUTC: true })
   if (!date) return ''
   const now = new Date()
   const sameDay = date.toDateString() === now.toDateString()
