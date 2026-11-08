@@ -1119,5 +1119,19 @@
       "confirm": "Restore",
       "restoring": "Restoring…"
     }
+  },
+  "auth": {
+    "title": "Sign in to Portico",
+    "subtitle": "This Portico server requires an access token for remote management.",
+    "placeholder": "Access token",
+    "submit": "Sign in",
+    "verifying": "Verifying…",
+    "invalidToken": "The access token is invalid.",
+    "unreachable": "Cannot reach the Portico server.",
+    "hint": "Run this on the server to print the token and a sign-in link:",
+    "sectionTitle": "Access",
+    "signedIn": "Signed in with an access token",
+    "signedInHint": "The token is stored in this browser. Sign out on shared devices.",
+    "signOut": "Sign out"
   }
 }

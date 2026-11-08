@@ -1,7 +1,8 @@
-// 浏览器直连开发（`pnpm dev`）时 Wails 运行时不可用，
-// 这里通过 setTransport 拦截全部 binding 调用并按 methodID 返回演示数据。
-// `wails3 task dev` 走真实运行时，不会进入此分支（见 main.ts 的探测）。
-import { setTransport } from '@wailsio/runtime'
+// 浏览器直连开发（`pnpm dev`）且 portico-server 未运行时，
+// 这里通过 setTransport 拦截全部 binding 调用并按方法名返回演示数据。
+// 后端可达时 main.ts 改装 HTTP transport，不会进入此分支。
+import { objectNames, setTransport } from '@wailsio/runtime'
+import { rpcMethodName } from '../transport/httpTransport'
 import {
   mockAppLogEntries,
   mockMcpInjection,
@@ -108,24 +109,24 @@ const syncMockActiveMapping = (provider: any) => {
   provider.modelMapping = active ? clone(active.mapping) : {}
 }
 
-// methodID → handler；未知 ID 返回 null（与真实运行时「方法存在但零值」行为接近）。
-const handlers: Record<number, (...args: any[]) => any> = {
+// "{Facade}.{Method}" → handler；未知方法返回 null（与真实运行时「方法存在但零值」行为接近）。
+const handlers: Record<string, (...args: any[]) => any> = {
   // routingfacade
-  3055782468: () => clone(mockPreferences),
-  2684023907: (preferences: any) => {
+  'RoutingFacade.GetAppPreferences': () => clone(mockPreferences),
+  'RoutingFacade.SaveAppPreferences': (preferences: any) => {
     Object.assign(mockPreferences, preferences)
     return clone(mockPreferences)
   },
-  1587903684: (platform: string) => {
+  'RoutingFacade.GetProfile': (platform: string) => {
     const profile = mockProfiles.find((p) => p.platform === platform)
     return clone(profile ?? { platform, defaultProviderId: null, providers: [] })
   },
-  1086826521: (profile: any) => {
+  'RoutingFacade.SaveProfile': (profile: any) => {
     const index = mockProfiles.findIndex((p) => p.platform === profile.platform)
     if (index >= 0) mockProfiles[index] = clone(profile)
     return clone(profile)
   },
-  3025431918: (platform: string, providerID: number, originalName: string, scheme: any, activate: boolean) => {
+  'RoutingFacade.SaveModelMappingScheme': (platform: string, providerID: number, originalName: string, scheme: any, activate: boolean) => {
     const { profile, provider } = mockProviderFor(platform, providerID)
     provider.modelMappingSchemes ??= []
     const index = originalName
@@ -148,7 +149,7 @@ const handlers: Record<number, (...args: any[]) => any> = {
     syncMockActiveMapping(provider)
     return clone(profile)
   },
-  2625227036: (platform: string, providerID: number, name: string) => {
+  'RoutingFacade.DeleteModelMappingScheme': (platform: string, providerID: number, name: string) => {
     const { profile, provider } = mockProviderFor(platform, providerID)
     const index = provider.modelMappingSchemes?.findIndex((item: any) => item.name === name) ?? -1
     if (index < 0) throw new Error('mapping scheme not found (demo)')
@@ -157,7 +158,7 @@ const handlers: Record<number, (...args: any[]) => any> = {
     syncMockActiveMapping(provider)
     return clone(profile)
   },
-  2640447551: (platform: string, providerID: number, name: string) => {
+  'RoutingFacade.SetActiveModelMappingScheme': (platform: string, providerID: number, name: string) => {
     const { profile, provider } = mockProviderFor(platform, providerID)
     if (name && !provider.modelMappingSchemes?.some((item: any) => item.name === name)) {
       throw new Error('mapping scheme not found (demo)')
@@ -166,7 +167,7 @@ const handlers: Record<number, (...args: any[]) => any> = {
     syncMockActiveMapping(provider)
     return clone(profile)
   },
-  3032235800: async (provider: any) => {
+  'RoutingFacade.TestProvider': async (provider: any) => {
     await delay(350)
     const reachable = !/deepseek/i.test(provider?.name ?? '')
     return reachable
@@ -175,23 +176,23 @@ const handlers: Record<number, (...args: any[]) => any> = {
   },
 
   // observabilityfacade
-  1692049370: (platform: string, provider: string, rangeKey: string, costTier: string, httpStatus: string, page: number, pageSize: number) => {
+  'ObservabilityFacade.ListRequestLogs': (platform: string, provider: string, rangeKey: string, costTier: string, httpStatus: string, page: number, pageSize: number) => {
     const filtered = filterLogs(mockRequestLogs, platform, provider, rangeKey || 'last7days', costTier, httpStatus)
     const p = Math.max(1, page || 1)
     const size = pageSize || 200
     return { items: clone(filtered.slice((p - 1) * size, p * size)), total: filtered.length, page: p, page_size: size }
   },
-  2012320427: (platform: string, provider: string, rangeKey: string, costTier: string, httpStatus: string) => ({
+  'ObservabilityFacade.StatsSince': (platform: string, provider: string, rangeKey: string, costTier: string, httpStatus: string) => ({
     ...statsOf(filterLogs(mockRequestLogs, platform, provider, rangeKey || 'last7days', costTier, httpStatus)),
     series: seriesOf(filterLogs(mockRequestLogs, platform, provider, rangeKey || 'last7days', costTier, httpStatus)),
   }),
-  2260435430: (platform: string, sessionID: string) =>
+  'ObservabilityFacade.ListSessionRequestLogs': (platform: string, sessionID: string) =>
     clone(mockRequestLogs.filter((l) => l.platform === platform && l.session_id === sessionID)),
-  3709587354: (platform: string) => {
+  'ObservabilityFacade.ListProviders': (platform: string) => {
     const names = new Set(mockRequestLogs.filter((l) => !platform || l.platform === platform).map((l) => l.provider))
     return [...names]
   },
-  720220581: (platform: string) => {
+  'ObservabilityFacade.ProviderDailyStats': (platform: string) => {
     const names = new Set(mockRequestLogs.filter((l) => !platform || l.platform === platform).map((l) => l.provider))
     return [...names].map((name) => {
       const logs = mockRequestLogs.filter((l) => l.provider === name && (!platform || l.platform === platform))
@@ -211,7 +212,7 @@ const handlers: Record<number, (...args: any[]) => any> = {
       }
     })
   },
-  1068250303: (days: number) => {
+  'ObservabilityFacade.HeatmapStats': (days: number) => {
     const cutoff = new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000)
     const byDay = new Map<string, typeof mockRequestLogs>()
     mockRequestLogs.forEach((log) => {
@@ -231,8 +232,8 @@ const handlers: Record<number, (...args: any[]) => any> = {
   },
 
   // sessionfacade
-  2856418829: (platform: string) => clone(mockSessions(platform)),
-  2191426179: (platform: string, sessionID: string) => {
+  'SessionFacade.ListByPlatform': (platform: string) => clone(mockSessions(platform)),
+  'SessionFacade.Unbind': (platform: string, sessionID: string) => {
     for (let i = mockRequestLogs.length - 1; i >= 0; i--) {
       if (mockRequestLogs[i].platform === platform && mockRequestLogs[i].session_id === sessionID) {
         mockRequestLogs.splice(i, 1)
@@ -242,19 +243,19 @@ const handlers: Record<number, (...args: any[]) => any> = {
   },
 
   // platformproxyfacade
-  3973939786: (platform: string) => clone(mockProxyStatus[platform] ?? { enabled: false, base_url: '' }),
-  3899534107: (platform: string) => {
+  'PlatformProxyFacade.GetStatus': (platform: string) => clone(mockProxyStatus[platform] ?? { enabled: false, base_url: '' }),
+  'PlatformProxyFacade.Enable': (platform: string) => {
     if (mockProxyStatus[platform]) mockProxyStatus[platform].enabled = true
     return null
   },
-  471175048: (platform: string) => {
+  'PlatformProxyFacade.Disable': (platform: string) => {
     if (mockProxyStatus[platform]) mockProxyStatus[platform].enabled = false
     return null
   },
 
   // mcpgatewayfacade
-  787164027: () => clone(mockMcpServers),
-  1788497038: (server: any) => {
+  'McpGatewayFacade.List': () => clone(mockMcpServers),
+  'McpGatewayFacade.Save': (server: any) => {
     if (server.id) {
       const index = mockMcpServers.findIndex((s) => s.id === server.id)
       if (index >= 0) mockMcpServers[index] = clone(server)
@@ -264,23 +265,23 @@ const handlers: Record<number, (...args: any[]) => any> = {
     }
     return clone(server)
   },
-  2806829936: (id: number) => {
+  'McpGatewayFacade.Delete': (id: number) => {
     const index = mockMcpServers.findIndex((s) => s.id === id)
     if (index >= 0) mockMcpServers.splice(index, 1)
     return null
   },
-  4039365050: (id: number, enabled: boolean) => {
+  'McpGatewayFacade.SetEnabled': (id: number, enabled: boolean) => {
     const server = mockMcpServers.find((s) => s.id === id)
     if (server) server.enabled = enabled
     return null
   },
-  2395227903: async (server: any) => {
+  'McpGatewayFacade.TestConnection': async (server: any) => {
     await delay(400)
     return server?.enabled === false
       ? { success: false, toolCount: 0, error: 'server disabled (demo)', durationMs: 10 }
       : { success: true, toolCount: 5, durationMs: 320 }
   },
-  2403049257: () =>
+  'McpGatewayFacade.Statuses': () =>
     mockMcpServers.map((server) => ({
       serverId: server.id,
       state: server.enabled ? 'connected' : 'disabled',
@@ -288,30 +289,30 @@ const handlers: Record<number, (...args: any[]) => any> = {
         ? mockMcpTools.filter((tool) => tool.serverId === server.id).length
         : 0,
     })),
-  3609087734: () => 'http://127.0.0.1:18100/mcp',
-  308868850: () => clone(mockMcpTools),
-  314695828: (platform: string) => mockMcpInjection[platform] ?? false,
-  420971030: (platform: string) => {
+  'McpGatewayFacade.Endpoint': () => 'http://127.0.0.1:18100/mcp',
+  'McpGatewayFacade.ListTools': () => clone(mockMcpTools),
+  'McpGatewayFacade.GetInjectionStatus': (platform: string) => mockMcpInjection[platform] ?? false,
+  'McpGatewayFacade.Inject': (platform: string) => {
     mockMcpInjection[platform] = true
     return null
   },
-  2053537476: (platform: string) => {
+  'McpGatewayFacade.RemoveInjection': (platform: string) => {
     mockMcpInjection[platform] = false
     return null
   },
 
   // configsyncfacade
-  3381139004: () => clone(mockSyncSettings),
-  1278112865: (settings: any) => {
+  'ConfigSyncFacade.GetSyncSettings': () => clone(mockSyncSettings),
+  'ConfigSyncFacade.SaveSyncSettings': (settings: any) => {
     Object.assign(mockSyncSettings, settings)
     return clone(mockSyncSettings)
   },
-  1558873298: async () => {
+  'ConfigSyncFacade.TestConnection': async () => {
     await delay(300)
     return null
   },
-  1408576833: () => clone(mockRemoteSnapshotMeta),
-  3147351989: () => ({
+  'ConfigSyncFacade.GetRemoteSnapshotMeta': () => clone(mockRemoteSnapshotMeta),
+  'ConfigSyncFacade.PullSnapshot': () => ({
     backend: {
       appPreferences: clone(mockPreferences),
       claudeProfile: clone(mockProfiles[0]),
@@ -320,18 +321,18 @@ const handlers: Record<number, (...args: any[]) => any> = {
     },
     ui: { theme: 'systemdefault', locale: 'zh' },
   }),
-  938748122: () => ({
+  'ConfigSyncFacade.PushSnapshot': () => ({
     exists: true,
     updatedAt: new Date().toISOString(),
     deviceName: 'demo-device',
     appVersion: '1.0.0',
     schemaVersion: 1,
   }),
-  1456844065: () => 'rollback-20261105-demo',
-  4255137226: () => null,
+  'ConfigSyncFacade.CreateLocalRollback': () => 'rollback-20261105-demo',
+  'ConfigSyncFacade.ApplySnapshot': () => null,
 
   // applogfacade
-  1766650753: (offset: number, maxLines: number, level: string, keyword: string) => {
+  'AppLogFacade.TailAppLog': (offset: number, maxLines: number, level: string, keyword: string) => {
     let entries = [...mockAppLogEntries]
     if (level) entries = entries.filter((e) => e.level === level)
     if (keyword) entries = entries.filter((e) => e.message.includes(keyword))
@@ -341,18 +342,17 @@ const handlers: Record<number, (...args: any[]) => any> = {
   },
 
   // hotkeyfacade（当前前端未消费，占位）
-  2003331397: () => [],
-  4236411700: () => [],
-  1765084196: () => null,
+  'HotkeyFacade.Close': () => [],
+  'HotkeyFacade.GetHotkeys': () => [],
+  'HotkeyFacade.UpHotkey': () => null,
 }
 
 export const installMockTransport = () => {
   setTransport({
     call: async (objectID: number, _method: number, _windowName: string, args: any) => {
       await delay(60)
-      if (objectID === 10) return null // CancelCall
-      const methodID = args?.methodID
-      const handler = handlers[methodID]
+      if (objectID !== objectNames.Call) return null
+      const handler = args?.methodName ? handlers[rpcMethodName(args.methodName)] : undefined
       if (!handler) return null
       return handler(...(args?.args ?? []))
     },

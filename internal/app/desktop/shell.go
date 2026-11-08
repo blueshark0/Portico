@@ -1,30 +1,44 @@
 package desktop
 
 import (
+	"context"
 	"io/fs"
 	"log"
 	"runtime"
+	"sync"
 	"time"
+
+	"portico/internal/app/sidecar"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 	"github.com/wailsapp/wails/v3/pkg/services/dock"
 )
 
+const connectTimeout = 30 * time.Second
+
+// Shell 是桌面 UI 壳：窗口、托盘与 Dock。业务界面与后端逻辑都在 portico-server 中，
+// 窗口先显示本地启动页，连接（必要时拉起）后端后再加载其管理页面。
 type Shell struct {
 	app         *application.App
 	dockService *dock.DockService
 	trayIcons   fs.ReadFileFS
+	backend     *sidecar.Manager
 
 	mainWindow         *application.WebviewWindow
 	mainWindowCentered bool
+
+	mu         sync.Mutex
+	adminURL   string
+	connecting bool
 }
 
-func NewShell(app *application.App, dockService *dock.DockService, trayIcons fs.ReadFileFS) *Shell {
+func NewShell(app *application.App, dockService *dock.DockService, trayIcons fs.ReadFileFS, backend *sidecar.Manager) *Shell {
 	return &Shell{
 		app:         app,
 		dockService: dockService,
 		trayIcons:   trayIcons,
+		backend:     backend,
 	}
 }
 
@@ -60,7 +74,58 @@ func (s *Shell) Configure() {
 		}
 		s.showMainWindow(true)
 	})
+	s.app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(event *application.ApplicationEvent) {
+		go s.connect()
+	})
 	s.configureTray()
+}
+
+// connect 确保后端可用并让窗口加载其管理页面；失败时在窗口内显示原因。
+func (s *Shell) connect() {
+	s.mu.Lock()
+	if s.connecting {
+		s.mu.Unlock()
+		return
+	}
+	s.connecting = true
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.connecting = false
+		s.mu.Unlock()
+	}()
+
+	s.mainWindow.SetURL("/")
+	ctx, cancel := context.WithTimeout(context.Background(), connectTimeout)
+	defer cancel()
+	conn, err := s.backend.Ensure(ctx)
+	if err != nil {
+		log.Printf("连接 Portico 服务失败: %v", err)
+		s.mainWindow.SetURL(errorPageURL(err.Error()))
+		return
+	}
+	if conn.Spawned {
+		log.Printf("已启动 Portico 服务: %s", conn.AdminURL)
+	}
+	s.mu.Lock()
+	s.adminURL = conn.AdminURL
+	s.mu.Unlock()
+	s.mainWindow.SetURL(s.backend.WindowURL(ctx, conn))
+}
+
+// quitAndStopBackend 请求后端退出后再退出桌面壳；后端不可达时直接退出。
+func (s *Shell) quitAndStopBackend() {
+	s.mu.Lock()
+	adminURL := s.adminURL
+	s.mu.Unlock()
+	if adminURL != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := s.backend.Shutdown(ctx, adminURL); err != nil {
+			log.Printf("停止 Portico 服务失败: %v", err)
+		}
+		cancel()
+	}
+	s.app.Quit()
 }
 
 func (s *Shell) focusMainWindow() {
@@ -105,8 +170,16 @@ func (s *Shell) configureTray() {
 	trayMenu.Add("显示主窗口").OnClick(func(ctx *application.Context) {
 		s.showMainWindow(true)
 	})
-	trayMenu.Add("退出").OnClick(func(ctx *application.Context) {
+	trayMenu.Add("重新连接服务").OnClick(func(ctx *application.Context) {
+		go s.connect()
+	})
+	trayMenu.AddSeparator()
+	// 后端是独立进程：退出界面不影响 CLI 通过 relay 继续工作。
+	trayMenu.Add("退出界面（服务继续运行）").OnClick(func(ctx *application.Context) {
 		s.app.Quit()
+	})
+	trayMenu.Add("退出并停止服务").OnClick(func(ctx *application.Context) {
+		go s.quitAndStopBackend()
 	})
 	systray.SetMenu(trayMenu)
 

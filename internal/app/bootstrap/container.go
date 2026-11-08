@@ -25,9 +25,6 @@ import (
 	"portico/internal/shared/kernel"
 	"portico/internal/shared/logging"
 	"portico/internal/shared/storage"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/services/dock"
 )
 
 const defaultSessionCleanupInterval = 5 * time.Minute
@@ -45,7 +42,6 @@ type Container struct {
 	proxyFacade   *facades.PlatformProxyFacade
 	mcpFacade     *facades.McpGatewayFacade
 	mcpAggregator *mcpgatewayapp.Aggregator
-	dockService   *dock.DockService
 	shutdownOnce  sync.Once
 }
 
@@ -121,28 +117,27 @@ func Initialize(appVersion string) (*Container, error) {
 		proxyFacade:   facades.NewPlatformProxyFacade(platformProxyService),
 		mcpFacade:     facades.NewMcpGatewayFacade(mcpService, platformProxyService, "http://"+relayServer.Addr()+"/mcp"),
 		mcpAggregator: mcpAggregator,
-		dockService:   dock.New(),
 	}, nil
 }
 
-func (c *Container) ApplicationServices(extra ...application.Service) []application.Service {
-	services := []application.Service{
-		application.NewService(c.hotkeyService),
-		application.NewService(c.routingFacade),
-		application.NewService(c.syncFacade),
-		application.NewService(c.sessionFacade),
-		application.NewService(c.obsFacade),
-		application.NewService(c.appLogFacade),
-		application.NewService(c.proxyFacade),
-		application.NewService(c.mcpFacade),
-		application.NewService(c.dockService),
+// Facades 返回对 UI 暴露的全部 facade，由 admin HTTP API 以 "{Facade}.{Method}" 形式分发。
+// 新增 facade 时还需在 cmd/bindgen 中登记，前端才能生成对应的 TS bindings。
+func (c *Container) Facades() []any {
+	return []any{
+		c.hotkeyService,
+		c.routingFacade,
+		c.syncFacade,
+		c.sessionFacade,
+		c.obsFacade,
+		c.appLogFacade,
+		c.proxyFacade,
+		c.mcpFacade,
 	}
-	services = append(services, extra...)
-	return services
 }
 
-func (c *Container) DockService() *dock.DockService {
-	return c.dockService
+// RelayAddr 返回 relay 的监听地址（固定为回环地址）。
+func (c *Container) RelayAddr() string {
+	return c.relayServer.Addr()
 }
 
 func (c *Container) StartBackground() error {

@@ -1119,5 +1119,19 @@
       "confirm": "确认恢复",
       "restoring": "恢复中…"
     }
+  },
+  "auth": {
+    "title": "登录 Portico",
+    "subtitle": "此 Portico 服务需要访问令牌才能远程管理。",
+    "placeholder": "访问令牌",
+    "submit": "登录",
+    "verifying": "验证中…",
+    "invalidToken": "访问令牌无效。",
+    "unreachable": "无法连接到 Portico 服务。",
+    "hint": "在服务器上运行以下命令查看令牌和登录链接：",
+    "sectionTitle": "访问",
+    "signedIn": "已使用访问令牌登录",
+    "signedInHint": "令牌保存在当前浏览器中，在共用设备上请记得退出登录。",
+    "signOut": "退出登录"
   }
 }
