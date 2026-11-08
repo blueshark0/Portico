@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	observabilitydomain "portico/internal/observability/domain"
-	"portico/internal/shared/storage"
 )
 
 // SessionUsageForSessions aggregates only the active bindings requested by the
@@ -28,7 +27,7 @@ func (q *SQLiteQueries) SessionUsageForSessions(platform string, sessionIDs []st
 		return result, nil
 	}
 
-	db, err := storage.DB(storage.RequestLogDBName)
+	db, err := requestLogReadDB()
 	if err != nil {
 		return nil, err
 	}
