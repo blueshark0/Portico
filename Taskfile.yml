@@ -31,7 +31,19 @@ tasks:
       - task: "{{OS}}:run"
 
   dev:
-    summary: Runs the application in development mode
+    summary: Runs the desktop shell in development mode (it spawns bin/portico-server)
     cmds:
       - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  build:server:
+    summary: Builds the headless backend (portico-server, with embedded Web UI) for the current platform
+    cmds:
+      - task: common:build:server
+
+  run:server:
+    summary: Builds and runs portico-server in the foreground (configure via env, e.g. PORTICO_ADMIN_LISTEN=0.0.0.0:18101)
+    deps:
+      - build:server
+    cmds:
+      - '{{.BIN_DIR}}/portico-server serve'
 

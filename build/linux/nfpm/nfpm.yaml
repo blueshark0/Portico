@@ -19,6 +19,11 @@ release: "1"
 contents:
   - src: "./bin/Portico"
     dst: "/usr/local/bin/Portico"
+  # 桌面版从自身所在目录拉起后端 sidecar，二者必须安装在同一目录。
+  - src: "./bin/portico-server"
+    dst: "/usr/local/bin/portico-server"
+  - src: "./build/linux/systemd/portico-server.service"
+    dst: "/usr/lib/systemd/user/portico-server.service"
   - src: "./build/appicon-128.png"
     dst: "/usr/share/icons/hicolor/128x128/apps/Portico.png"
   - src: "./build/linux/Portico.desktop"

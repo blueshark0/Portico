@@ -33,14 +33,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
 
-      # main.go 通过 //go:embed all:frontend/dist 嵌入前端产物，vet/test 前必须就位
-      - name: Download frontend dist
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
-
-      # main.go 通过 //go:embed all:frontend/dist 嵌入前端产物，vet/test 前必须就位
+      # frontend/embed.go 通过 //go:embed all:dist 嵌入前端产物（portico-server 托管），vet/test 前必须就位
       - name: Download frontend dist
         uses: actions/download-artifact@v4
         with:
@@ -52,6 +45,13 @@ jobs:
 
       - name: go test (race)
         run: go test -race -count=1 ./...
+
+      # portico-server 承诺纯 Go（无 cgo），可直接交叉编译到各服务器平台。
+      - name: Build portico-server without cgo
+        run: |
+          CGO_ENABLED=0 go build -o /dev/null ./cmd/portico-server
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/portico-server
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/portico-server
 
   frontend-build:
     runs-on: ubuntu-latest

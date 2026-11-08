@@ -108,16 +108,18 @@ jobs:
         env:
           PRODUCTION: "true"
 
-      - name: Verify Binary
+      - name: Verify Binaries
         run: |
-          if (Test-Path "bin\Portico.exe") {
-            Write-Host "✓ Binary found: bin\Portico.exe"
-            Get-Item "bin\Portico.exe" | Format-List Name,Length,LastWriteTime
-          } else {
-            Write-Host "✗ Binary not found!"
-            Write-Host "Listing bin directory:"
-            Get-ChildItem bin -ErrorAction SilentlyContinue
-            exit 1
+          foreach ($binary in @("bin\Portico.exe", "bin\portico-server.exe")) {
+            if (Test-Path $binary) {
+              Write-Host "✓ Binary found: $binary"
+              Get-Item $binary | Format-List Name,Length,LastWriteTime
+            } else {
+              Write-Host "✗ Binary not found: $binary"
+              Write-Host "Listing bin directory:"
+              Get-ChildItem bin -ErrorAction SilentlyContinue
+              exit 1
+            }
           }
 
       - name: Create NSIS Installer
@@ -126,9 +128,15 @@ jobs:
           Push-Location build\windows\nsis
           wails3 generate webview2bootstrapper
           $binaryPath = (Resolve-Path "..\..\..\bin\Portico.exe").Path
+          $serverPath = (Resolve-Path "..\..\..\bin\portico-server.exe").Path
           Write-Host "Binary path: $binaryPath"
-          makensis -DARG_WAILS_AMD64_BINARY="$binaryPath" project.nsi
+          Write-Host "Server path: $serverPath"
+          makensis -DARG_WAILS_AMD64_BINARY="$binaryPath" -DARG_PORTICO_SERVER_BINARY="$serverPath" project.nsi
           Pop-Location
+
+      # 便携版：桌面壳从自身目录拉起 portico-server.exe，二者必须放在一起。
+      - name: Create portable archive
+        run: Compress-Archive -Path bin\Portico.exe, bin\portico-server.exe -DestinationPath bin\portico-windows-amd64-portable.zip
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -136,11 +144,59 @@ jobs:
           name: windows-amd64
           path: |
             bin/Portico-amd64-installer.exe
-            bin/Portico.exe
+            bin/portico-windows-amd64-portable.zip
+
+  build-server:
+    name: Build portico-server (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      # bindings 生成使用 -tags server，不需要 gtk / webkit；wails3 CLI 本身也可无 cgo 安装。
+      - name: Install Wails
+        run: CGO_ENABLED=0 go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
+
+      - name: Build Web UI
+        run: |
+          wails3 task common:generate:bindings
+          cd frontend
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Build and archive
+        run: |
+          # 版本号取自 internal/shared/buildinfo（与桌面版一致；不一致会触发桌面版重启后端）。
+          for arch in amd64 arm64; do
+            dir="portico-server-linux-${arch}"
+            mkdir -p "dist/${dir}"
+            CGO_ENABLED=0 GOOS=linux GOARCH=${arch} go build -trimpath -buildvcs=false -ldflags="-s -w" \
+              -o "dist/${dir}/portico-server" ./cmd/portico-server
+            cp build/linux/systemd/portico-server.service LICENSE "dist/${dir}/"
+            tar -C dist -czf "dist/${dir}.tar.gz" "${dir}"
+          done
+          ls -lh dist/*.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-linux
+          path: dist/*.tar.gz
 
   create-release:
     name: Create Release
-    needs: [build-macos, build-windows]
+    needs: [build-macos, build-windows, build-server]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -159,7 +215,8 @@ jobs:
           cp artifacts/macos-arm64/portico-macos-arm64.zip release-assets/
           cp artifacts/macos-amd64/portico-macos-amd64.zip release-assets/
           cp artifacts/windows-amd64/Portico-amd64-installer.exe release-assets/
-          cp artifacts/windows-amd64/Portico.exe release-assets/
+          cp artifacts/windows-amd64/portico-windows-amd64-portable.zip release-assets/
+          cp artifacts/server-linux/*.tar.gz release-assets/
           ls -lh release-assets/
 
       - name: Create Release
@@ -188,9 +245,10 @@ jobs:
 
             ## 安装说明
 
-            - **Windows**：下载 `portico-amd64-installer.exe` 运行安装，或下载 `portico.exe` 直接运行
+            - **Windows**：下载 `Portico-amd64-installer.exe` 运行安装，或下载 `portico-windows-amd64-portable.zip` 解压后运行 `Portico.exe`（需与 `portico-server.exe` 放在同一目录）
             - **macOS (Apple Silicon)**：下载 `portico-macos-arm64.zip`
             - **macOS (Intel)**：下载 `portico-macos-amd64.zip`
+            - **Linux 服务器（无桌面）**：下载 `portico-server-linux-<arch>.tar.gz`，运行 `portico-server`，浏览器访问管理界面（见 README「服务器部署」）
           draft: false
           prerelease: false
         env:

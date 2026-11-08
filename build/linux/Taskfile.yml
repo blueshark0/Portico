@@ -7,17 +7,16 @@ tasks:
   build:
     summary: Builds the application for Linux
     deps:
-      - task: common:build:frontend
+      # 桌面壳不内嵌前端；UI 由同目录的 portico-server（sidecar）提供。
+      - task: common:build:server
         vars:
-          BINDING_FLAGS:
-            ref: .BINDING_FLAGS
-          PRODUCTION:
-            ref: .PRODUCTION
+          SERVER_GOOS: linux
+          ARCH:
+            ref: .ARCH
       - task: common:generate:icons
     cmds:
       - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/{{.APP_NAME}}
     vars:
-      BINDING_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -buildvcs=false{{else}}-buildvcs=false{{end}}'
       BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-buildvcs=false -gcflags=all="-l"{{end}}'
     env:
       GOOS: linux

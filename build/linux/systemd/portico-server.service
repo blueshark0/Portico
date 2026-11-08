@@ -1,0 +1,31 @@
+# Portico 后端（systemd 用户服务）。
+#
+# 必须以使用 Claude Code / Codex / Gemini CLI 的那个用户运行：后端会改写该用户 HOME 下的
+# ~/.claude、~/.codex、~/.gemini，数据保存在 ~/.portico。因此这里是 user unit 而非系统服务。
+#
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now portico-server
+#   loginctl enable-linger "$USER"   # 未登录时也保持运行（服务器场景）
+#   portico-server token show        # 远程访问的令牌与地址
+#
+# 远程访问：用 `systemctl --user edit portico-server` 覆盖环境变量，例如
+#   [Service]
+#   Environment=PORTICO_ADMIN_LISTEN=0.0.0.0:18101
+#   Environment=PORTICO_ADMIN_TLS_CERT=/path/to/cert.pem
+#   Environment=PORTICO_ADMIN_TLS_KEY=/path/to/key.pem
+# 置于同机反向代理之后时改为保持回环监听，并设置 PORTICO_ADMIN_ALWAYS_TOKEN=1。
+
+[Unit]
+Description=Portico API relay and management server
+Documentation=https://github.com/blueshark0/Portico
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/portico-server serve
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
