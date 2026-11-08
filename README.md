@@ -110,7 +110,7 @@ Turning the toggle off restores the previous values. Provider names and API keys
 
 ## Headless server
 
-On a machine without a desktop, run the backend directly and manage it from a browser. Run it as the same user that runs the CLIs: Portico edits that user's `~/.claude`, `~/.codex` and `~/.gemini`.
+On a machine without a desktop, run the backend directly and manage it from a browser or the terminal UI. Run it as the same user that runs the CLIs: Portico edits that user's `~/.claude`, `~/.codex` and `~/.gemini`.
 
 ```sh
 tar -xzf portico-server-linux-amd64.tar.gz
@@ -120,6 +120,17 @@ cd portico-server-linux-amd64
 ```
 
 Open `http://<server>:18101/?token=<token>` (or open `http://<server>:18101` and paste the token). The token is saved in that browser and removed from the address bar.
+
+### Terminal UI
+
+`portico-server tui` opens a full-screen terminal UI over the same management API — handy over SSH. On the server itself it finds the running backend and needs no token:
+
+```sh
+./portico-server tui
+PORTICO_ADMIN_TOKEN=<token> ./portico-server tui --url https://<server>:18101   # from another machine
+```
+
+It covers the day-to-day tasks: turning CLI integration on and off, switching the default provider, adding/editing/archiving providers and testing connections, browsing request logs, unbinding sessions, toggling MCP servers and gateway injection, and following the app log. Model mapping, request-body rewrites, proxy settings and config sync are only in the web UI. Press `?` for key bindings; quitting the TUI leaves the backend running.
 
 | | |
 | --- | --- |
@@ -367,6 +378,7 @@ internal/
   app/sidecar/                       desktop ↔ backend: discover, spawn, stop portico-server
   interfaces/http/relay/             loopback relay: auth, routing, forwarding, MCP mount
   interfaces/http/admin/             management API: token auth, facade RPC, static web UI
+  interfaces/tui/                    terminal UI (portico-server tui), a client of the management API
   interfaces/wails/                  facades exposed to the UI (served over the admin RPC)
   routing/                           providers, route profiles, model mapping schemes, probes
   sessions/                          session → provider stickiness (LRU + SQLite)

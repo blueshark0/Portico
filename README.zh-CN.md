@@ -110,7 +110,7 @@ xattr -cr /Applications/Portico.app
 
 ## 服务器部署（无桌面）
 
-在没有桌面环境的机器上，直接运行后端并用浏览器管理。请以运行 CLI 的同一个用户身份运行：Portico 会修改该用户的 `~/.claude`、`~/.codex` 与 `~/.gemini`。
+在没有桌面环境的机器上，直接运行后端，用浏览器或终端界面管理。请以运行 CLI 的同一个用户身份运行：Portico 会修改该用户的 `~/.claude`、`~/.codex` 与 `~/.gemini`。
 
 ```sh
 tar -xzf portico-server-linux-amd64.tar.gz
@@ -120,6 +120,17 @@ cd portico-server-linux-amd64
 ```
 
 打开 `http://<服务器>:18101/?token=<令牌>`，或打开 `http://<服务器>:18101` 后粘贴令牌。令牌会保存在当前浏览器中，并从地址栏移除。
+
+### 终端界面（TUI）
+
+`portico-server tui` 提供基于同一套管理 API 的全屏终端界面，适合 SSH 登录后直接使用。在服务器本机运行时会自动找到运行中的后端，无需令牌：
+
+```sh
+./portico-server tui
+PORTICO_ADMIN_TOKEN=<令牌> ./portico-server tui --url https://<服务器>:18101   # 从其他机器连接
+```
+
+TUI 覆盖日常操作：开关 CLI 接管、切换默认供应商、新增 / 编辑 / 归档供应商并测试连接、浏览请求日志、解除会话绑定、启停 MCP 服务与注入网关、跟随应用日志。模型映射、请求体改写、代理和配置同步仅在 Web UI 中提供。按 `?` 查看快捷键；退出 TUI 不会停止后端。
 
 | | |
 | --- | --- |
@@ -367,6 +378,7 @@ internal/
   app/sidecar/                       桌面 ↔ 后端：发现、拉起、停止 portico-server
   interfaces/http/relay/             回环 relay：鉴权、路由、转发、MCP 挂载
   interfaces/http/admin/             管理 API：令牌认证、facade RPC、静态 Web 界面
+  interfaces/tui/                    终端界面（portico-server tui），管理 API 的客户端
   interfaces/wails/                  暴露给界面的 facade（经管理 API 的 RPC 提供）
   routing/                           供应商、路由档案、模型映射方案、连通性探测
   sessions/                          会话 → 供应商粘性（LRU + SQLite）
