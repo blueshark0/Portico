@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 
 	_ "modernc.org/sqlite"
@@ -21,6 +22,8 @@ type ConnectionConfig struct {
 var connections = struct {
 	sync.RWMutex
 	dbs map[string]*sql.DB
+	// order lists registered names, oldest first; see CloseConnections.
+	order []string
 }{dbs: make(map[string]*sql.DB)}
 
 // OpenConnections opens and registers all connection pools. Pools opened by
@@ -70,6 +73,7 @@ func OpenConnection(config ConnectionConfig) error {
 		return fmt.Errorf("database connection %q is already registered", config.Name)
 	}
 	connections.dbs[config.Name] = db
+	connections.order = append(connections.order, config.Name)
 	return nil
 }
 
@@ -91,6 +95,7 @@ func CloseConnection(name string) error {
 	db, ok := connections.dbs[name]
 	if ok {
 		delete(connections.dbs, name)
+		connections.order = slices.DeleteFunc(connections.order, func(n string) bool { return n == name })
 	}
 	connections.Unlock()
 	if !ok {
@@ -99,16 +104,21 @@ func CloseConnection(name string) error {
 	return db.Close()
 }
 
-// CloseConnections closes every registered connection pool.
+// CloseConnections closes every registered connection pool, newest first. A
+// read-only pool opens after the writer on the same file and must close before
+// it: SQLite only checkpoints and removes -wal/-shm when the last connection to
+// close can write.
 func CloseConnections() error {
 	connections.Lock()
 	dbs := connections.dbs
+	order := connections.order
 	connections.dbs = make(map[string]*sql.DB)
+	connections.order = nil
 	connections.Unlock()
 
 	errs := make([]error, 0, len(dbs))
-	for name, db := range dbs {
-		if err := db.Close(); err != nil {
+	for _, name := range slices.Backward(order) {
+		if err := dbs[name].Close(); err != nil {
 			errs = append(errs, fmt.Errorf("close database connection %q: %w", name, err))
 		}
 	}

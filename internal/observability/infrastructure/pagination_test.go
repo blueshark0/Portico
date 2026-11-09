@@ -39,6 +39,11 @@ func paginationFixture(t testing.TB, count int) (*sql.DB, *SQLiteQueries, string
 	return db, NewSQLiteQueries(name), path
 }
 
+// 改动前的真实分页查询：直接在宽行上按 created_at、id 倒序翻页。
+func wideRowPageSQL(where string) string {
+	return "SELECT " + requestLogSelectColumns + " FROM request_log" + where + " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"
+}
+
 func TestDeferredPaginationMatchesOriginalOrderingAndFilters(t *testing.T) {
 	setRangeTestClock(t, time.Date(2026, 11, 6, 19, 0, 0, 0, time.FixedZone("UTC+8", 8*3600)))
 	db, q, _ := paginationFixture(t, 2500)
@@ -54,7 +59,7 @@ func TestDeferredPaginationMatchesOriginalOrderingAndFilters(t *testing.T) {
 								t.Fatal(err)
 							}
 							args = append(args, 30, (page-1)*30)
-							original, err := q.queryRequestLogs(db, "SELECT "+requestLogSelectColumns+" FROM request_log"+where+" ORDER BY id DESC LIMIT ? OFFSET ?", args...)
+							original, err := q.queryRequestLogs(db, wideRowPageSQL(where), args...)
 							if err != nil {
 								t.Fatal(err)
 							}
@@ -102,33 +107,38 @@ func BenchmarkRequestLogPagination(b *testing.B) {
 	for _, count := range []int{100000, 600000} {
 		b.Run(fmt.Sprintf("rows=%d", count), func(b *testing.B) {
 			db, q, _ := paginationFixture(b, count)
-			// Each platform has count/2 rows; also measure a page near its end.
-			for _, page := range []int{1, count / 500} {
-				b.Run(fmt.Sprintf("page=%d", page), func(b *testing.B) {
-					for _, legacy := range []bool{true, false} {
-						name := "ids_first"
-						if legacy {
-							name = "original"
-						}
-						b.Run(name, func(b *testing.B) {
-							b.ReportAllocs()
-							for b.Loop() {
-								if !legacy {
-									if _, err := q.ListRequestLogs("claude", "", "last7days", "all", "all", page, 200); err != nil {
+			// 默认视图是日志页打开时的查询；claude 覆盖带过滤的视图。
+			for _, platform := range []string{"", "claude"} {
+				view := platform
+				if view == "" {
+					view = "default"
+				}
+				b.Run("view="+view, func(b *testing.B) {
+					// 每个平台有 count/2 行；同时测一页接近末尾的深分页。
+					for _, page := range []int{1, count / 500} {
+						b.Run(fmt.Sprintf("page=%d", page), func(b *testing.B) {
+							b.Run("original", func(b *testing.B) {
+								b.ReportAllocs()
+								for b.Loop() {
+									where, args := requestLogListWhere(platform, "", "last7days", "all", "all")
+									var total int
+									if err := db.QueryRow("SELECT COUNT(*) FROM request_log"+where, args...).Scan(&total); err != nil {
 										b.Fatal(err)
 									}
-									continue
+									args = append(args, 200, (page-1)*200)
+									if _, err := q.queryRequestLogs(db, wideRowPageSQL(where), args...); err != nil {
+										b.Fatal(err)
+									}
 								}
-								where, args := requestLogListWhere("claude", "", "last7days", "all", "all")
-								var total int
-								if err := db.QueryRow("SELECT COUNT(*) FROM request_log"+where, args...).Scan(&total); err != nil {
-									b.Fatal(err)
+							})
+							b.Run("ids_first", func(b *testing.B) {
+								b.ReportAllocs()
+								for b.Loop() {
+									if _, err := q.ListRequestLogs(platform, "", "last7days", "all", "all", page, 200); err != nil {
+										b.Fatal(err)
+									}
 								}
-								args = append(args, 200, (page-1)*200)
-								if _, err := q.queryRequestLogs(db, "SELECT "+requestLogSelectColumns+" FROM request_log"+where+" ORDER BY id DESC LIMIT ? OFFSET ?", args...); err != nil {
-									b.Fatal(err)
-								}
-							}
+							})
 						})
 					}
 				})

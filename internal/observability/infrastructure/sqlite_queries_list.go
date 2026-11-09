@@ -56,8 +56,6 @@ func (q *SQLiteQueries) ListRequestLogs(platform string, provider string, rangeK
 	}
 
 	args = append(args, pageSize, (page-1)*pageSize)
-	// Materialize only IDs for sorting/pagination; fetch wide rows for this page
-	// alone. Preserve id ordering even for timestamps inserted out of order.
 	items, err := q.queryRequestLogs(tx, requestLogPageSQL(where), args...)
 	if err != nil {
 		if isNoSuchTableErr(err) {
@@ -70,10 +68,18 @@ func (q *SQLiteQueries) ListRequestLogs(platform string, provider string, rangeK
 	return result, tx.Commit()
 }
 
+// requestLogPageIDsSQL 按 created_at 倒序取当前页 ID：WHERE 以 created_at 范围
+// 过滤，排序必须与之同列才能沿索引提前终止；若按 id 排序，SQLite 需要把范围内
+// 所有行取出再排序（7 天十几万行时每页数百毫秒）。created_at 是请求结束入队的
+// 时刻，与 id 顺序基本一致，同一秒内再以 id 倒序打破平局，保证分页稳定。
+func requestLogPageIDsSQL(where string) string {
+	return "SELECT id FROM request_log" + where + " ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"
+}
+
+// requestLogPageSQL 先物化当前页 ID，再按主键读取这些宽行，深分页时不必为跳过的行回表。
 func requestLogPageSQL(where string) string {
-	return "WITH page_ids AS MATERIALIZED (SELECT id FROM request_log" + where +
-		" ORDER BY id DESC LIMIT ? OFFSET ?) SELECT " + requestLogSelectColumns +
-		" FROM request_log WHERE id IN (SELECT id FROM page_ids) ORDER BY id DESC"
+	return "WITH page_ids AS MATERIALIZED (" + requestLogPageIDsSQL(where) + ") SELECT " + requestLogSelectColumns +
+		" FROM request_log WHERE id IN (SELECT id FROM page_ids) ORDER BY created_at DESC, id DESC"
 }
 
 func requestLogListWhere(platform, provider, rangeKey, costTier, httpStatus string) (string, []any) {
