@@ -2,9 +2,11 @@ package application
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 
 	sessiondomain "portico/internal/sessions/domain"
+	"portico/internal/shared/kernel"
 )
 
 type Repository interface {
@@ -14,6 +16,7 @@ type Repository interface {
 	RecordSessionBackground(platform, sessionID string, background bool) error
 	GetProviderSessions(platform, providerName string) ([]sessiondomain.SessionBinding, error)
 	GetPlatformSessions(platform string) ([]sessiondomain.SessionBinding, error)
+	GetRecentPlatformSessions(platform string, limit int) ([]sessiondomain.SessionBinding, error)
 	UnbindSession(platform, sessionID string) error
 	CleanExpiredSessions() error
 }
@@ -93,6 +96,34 @@ func (s *Service) RecordSessionBackground(platform, sessionID string, background
 
 func (s *Service) ListByPlatform(platform string) ([]sessiondomain.SessionBinding, error) {
 	return s.repo.GetPlatformSessions(platform)
+}
+
+// ListRecent 只返回绑定元数据，仪表盘不需要用量聚合。各平台由仓储只取最近 limit
+// 条（可见性与过期规则不变），合并后再按全局顺序截断。
+func (s *Service) ListRecent(limit int) ([]sessiondomain.SessionBinding, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	limit = min(limit, 50)
+	bindings := make([]sessiondomain.SessionBinding, 0)
+	for _, platform := range kernel.AllPlatforms() {
+		items, err := s.repo.GetRecentPlatformSessions(platform.String(), limit)
+		if err != nil {
+			return nil, err
+		}
+		bindings = append(bindings, items...)
+	}
+	sort.Slice(bindings, func(i, j int) bool {
+		a, b := bindings[i], bindings[j]
+		if !a.LastSuccessAt.Equal(b.LastSuccessAt) {
+			return a.LastSuccessAt.After(b.LastSuccessAt)
+		}
+		if a.Platform != b.Platform {
+			return a.Platform < b.Platform
+		}
+		return a.SessionID < b.SessionID
+	})
+	return bindings[:min(limit, len(bindings))], nil
 }
 
 func (s *Service) ListByProvider(platform, providerName string) ([]sessiondomain.SessionBinding, error) {

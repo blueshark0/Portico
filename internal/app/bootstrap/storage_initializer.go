@@ -47,6 +47,10 @@ func (i *Initializer) Initialize() error {
 	if err := i.runMigrations(); err != nil {
 		log.Printf("数据迁移警告: %v\n", err)
 	}
+	if err := i.initReadConnections(); err != nil {
+		_ = storage.CloseConnections()
+		return fmt.Errorf("初始化 request_log 只读连接失败: %w", err)
+	}
 	i.initialized = true
 	i.runStartupMaintenanceAsync()
 	return nil
@@ -95,6 +99,9 @@ func (i *Initializer) runStartupMaintenanceAsync() {
 	go func() {
 		if err := observabilityinfra.CleanupOldRequestLogs(observabilityinfra.RequestLogRetentionDays); err != nil {
 			log.Printf("启动维护警告: %v\n", err)
+		}
+		if err := observabilityinfra.RunRequestLogCostMaintenance(); err != nil {
+			log.Printf("费用回填警告: %v\n", err)
 		}
 	}()
 }

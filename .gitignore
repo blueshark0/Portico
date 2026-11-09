@@ -8,5 +8,5 @@ frontend/dist
 bin
 .idea/
 /build/linux/appimage/build
-/build/linux/appimage/appicon.png
+/build/linux/appimage/Portico.png
 /build/linux/appimage/Portico

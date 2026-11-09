@@ -3,6 +3,9 @@ package storage
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
+	"path/filepath"
+	"strings"
 )
 
 // SQLiteDSN 生成 modernc.org/sqlite 的连接串：_pragma 由驱动在每个新连接上
@@ -13,6 +16,17 @@ func SQLiteDSN(path string) string {
 		"&_pragma=synchronous(NORMAL)"+
 		"&_pragma=journal_size_limit(67108864)"+
 		"&_pragma=wal_autocheckpoint(1000)", path)
+}
+
+// SQLiteReadOnlyDSN 打开已存在的 WAL 数据库，不改动其日志设置。
+// query_only 作用于池内每个连接，作为第二道防线。
+func SQLiteReadOnlyDSN(path string) string {
+	uriPath := filepath.ToSlash(path)
+	if filepath.VolumeName(path) != "" && !strings.HasPrefix(uriPath, "/") {
+		uriPath = "/" + uriPath
+	}
+	u := url.URL{Scheme: "file", Path: uriPath}
+	return u.String() + "?mode=ro&_pragma=busy_timeout(15000)&_pragma=query_only(1)"
 }
 
 // ColumnDef 描述补列迁移中的一个列。

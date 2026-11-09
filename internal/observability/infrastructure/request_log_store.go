@@ -141,9 +141,6 @@ func EnsureRequestLogTableWithDB(db *sql.DB) error {
 	if _, err := db.Exec("UPDATE request_log SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL OR created_at = ''"); err != nil {
 		return err
 	}
-	if err := backfillRequestLogCosts(db, sharedPricingService()); err != nil {
-		return err
-	}
 
 	indexStatements := []string{
 		"CREATE INDEX IF NOT EXISTS idx_request_log_platform_created_at ON request_log(platform, created_at DESC)",
@@ -160,34 +157,81 @@ func EnsureRequestLogTableWithDB(db *sql.DB) error {
 	return nil
 }
 
+// ensureRequestLogUnpricedIndex 让启动检查只与待回填行数成正比：建索引时全表扫描
+// 一次，之后行回填完成就立刻离开这个部分索引。
+func ensureRequestLogUnpricedIndex(db *sql.DB) error {
+	requestLogWriteMu.Lock()
+	defer requestLogWriteMu.Unlock()
+	_, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_request_log_unpriced ON request_log(id) WHERE total_cost IS NULL")
+	return err
+}
+
+// RunRequestLogCostMaintenance 建立待回填索引并回填历史费用。首次升级时耗时与历史
+// 数据量成正比，因此由启动后的后台维护调用，不阻塞窗口出现；中途退出下次启动继续。
+func RunRequestLogCostMaintenance() error {
+	db, err := storage.DB(storage.RequestLogDBName)
+	if err != nil {
+		return err
+	}
+	if err := ensureRequestLogUnpricedIndex(db); err != nil {
+		return err
+	}
+	return backfillRequestLogCosts(db, sharedPricingService())
+}
+
 // backfillRequestLogCosts 为补列前写入的历史行（total_cost IS NULL）按当前
 // 定价一次性计算并回填 total_cost/has_pricing，让费用档位过滤对旧数据
-// 依然生效。之后的启动扫不到 NULL 行，本函数近似免费。
+// 依然生效。分批提交便于中断后重试；完成后部分索引为空。
 func backfillRequestLogCosts(db *sql.DB, pricing *modelpricing.Service) error {
 	if pricing == nil {
 		// 定价服务不可用时保留 NULL 标记，下次启动重试；
 		// 这些行仅在费用档位过滤下暂时不可见。
 		return nil
 	}
-	rows, err := db.Query(`SELECT id, model, input_tokens, output_tokens, cache_create_tokens, cache_read_tokens, is_fast
-		FROM request_log WHERE total_cost IS NULL`)
-	if err != nil {
-		return err
+	var afterID int64
+	total := 0
+	for {
+		updates, err := readRequestLogCostBatch(db, pricing, afterID)
+		if err != nil {
+			return err
+		}
+		if len(updates) == 0 {
+			break
+		}
+		if err := writeRequestLogCostBatch(db, updates); err != nil {
+			return err
+		}
+		afterID = updates[len(updates)-1].id
+		total += len(updates)
 	}
+	if total > 0 {
+		log.Printf("已为 %d 条历史 request_log 记录回填费用列\n", total)
+	}
+	return nil
+}
 
-	type costUpdate struct {
-		id         int64
-		totalCost  float64
-		hasPricing bool
+const requestLogCostBatchSize = 500
+
+type requestLogCostUpdate struct {
+	id         int64
+	totalCost  float64
+	hasPricing bool
+}
+
+func readRequestLogCostBatch(db *sql.DB, pricing *modelpricing.Service, afterID int64) ([]requestLogCostUpdate, error) {
+	rows, err := db.Query(`SELECT id, model, input_tokens, output_tokens, cache_create_tokens, cache_read_tokens, is_fast
+		FROM request_log WHERE total_cost IS NULL AND id > ? ORDER BY id LIMIT ?`, afterID, requestLogCostBatchSize)
+	if err != nil {
+		return nil, err
 	}
-	updates := make([]costUpdate, 0)
+	defer rows.Close()
+	updates := make([]requestLogCostUpdate, 0, requestLogCostBatchSize)
 	for rows.Next() {
 		var id int64
 		var model sql.NullString
 		var input, output, cacheCreate, cacheRead, isFast sql.NullInt64
 		if err := rows.Scan(&id, &model, &input, &output, &cacheCreate, &cacheRead, &isFast); err != nil {
-			rows.Close()
-			return err
+			return nil, err
 		}
 		cost := pricing.CalculateCost(model.String, modelpricing.UsageSnapshot{
 			InputTokens:       int(input.Int64),
@@ -196,28 +240,20 @@ func backfillRequestLogCosts(db *sql.DB, pricing *modelpricing.Service) error {
 			CacheReadTokens:   int(cacheRead.Int64),
 			IsFast:            isFast.Int64 != 0,
 		})
-		updates = append(updates, costUpdate{id: id, totalCost: cost.TotalCost, hasPricing: cost.HasPricing})
+		updates = append(updates, requestLogCostUpdate{id: id, totalCost: cost.TotalCost, hasPricing: cost.HasPricing})
 	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return err
-	}
-	rows.Close()
-	if len(updates) == 0 {
-		return nil
-	}
+	return updates, rows.Err()
+}
 
+func writeRequestLogCostBatch(db *sql.DB, updates []requestLogCostUpdate) error {
+	requestLogWriteMu.Lock()
+	defer requestLogWriteMu.Unlock()
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback()
-		}
-	}()
-	stmt, err := tx.Prepare("UPDATE request_log SET total_cost = ?, has_pricing = ? WHERE id = ?")
+	defer tx.Rollback()
+	stmt, err := tx.Prepare("UPDATE request_log SET total_cost = ?, has_pricing = ? WHERE id = ? AND total_cost IS NULL")
 	if err != nil {
 		return err
 	}
@@ -230,8 +266,6 @@ func backfillRequestLogCosts(db *sql.DB, pricing *modelpricing.Service) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	committed = true
 	markRequestLogDataChanged()
-	log.Printf("已为 %d 条历史 request_log 记录回填费用列\n", len(updates))
 	return nil
 }

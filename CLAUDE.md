@@ -70,7 +70,7 @@ SQLite via `modernc.org/sqlite` (pure Go). Connections are registered by name in
 ### Relay request flow (`internal/interfaces/http/relay`)
 
 `http.go` registers routes per platform (`/v1/messages` → Claude, `/responses[/compact]` → Codex, `/gemini/v1beta/*` and `/gemini/v1/*` → Gemini). Each request goes through these steps:
-1. `inboundAuthMiddleware` (`auth.go`) accepts only the placeholder token `portico` (the legacy `code-switch` is also accepted).
+1. `inboundAuthMiddleware` (`auth.go`) accepts only the placeholder token `portico`.
 2. A per-platform handler extracts request meta (model, session id).
 3. `routing.go` resolves the provider: the session-bound provider wins, otherwise the CLI's current provider. Disallowed models are rejected, not rerouted. Upstream errors never bind a session.
 4. Model mapping and request-body replacement rules (`request_body_replacements.go`) are applied to the raw body bytes using gjson/sjson. The body is never unmarshalled into structs, so unknown fields survive.

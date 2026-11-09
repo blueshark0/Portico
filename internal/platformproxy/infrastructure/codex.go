@@ -15,14 +15,13 @@ import (
 )
 
 const (
-	codexSettingsDir       = ".codex"
-	codexConfigFileName    = "config.toml"
-	codexAuthFileName      = "auth.json"
-	codexProviderKey       = "portico"
-	legacyCodexProviderKey = "code-switch"
-	codexEnvKey            = "OPENAI_API_KEY"
-	codexWireAPI           = "responses"
-	codexTokenValue        = "portico"
+	codexSettingsDir    = ".codex"
+	codexConfigFileName = "config.toml"
+	codexAuthFileName   = "auth.json"
+	codexProviderKey    = "portico"
+	codexEnvKey         = "OPENAI_API_KEY"
+	codexWireAPI        = "responses"
+	codexTokenValue     = "portico"
 )
 
 var codexConfigFieldSpecs = []tomlFieldSpec{
@@ -31,12 +30,6 @@ var codexConfigFieldSpecs = []tomlFieldSpec{
 	{Key: "model_providers.portico.base_url", Path: []string{"model_providers", "portico", "base_url"}},
 	{Key: "model_providers.portico.wire_api", Path: []string{"model_providers", "portico", "wire_api"}},
 	{Key: "model_providers.portico.requires_openai_auth", Path: []string{"model_providers", "portico", "requires_openai_auth"}},
-	// Keep legacy fields in snapshots so Enable removes the old provider and
-	// Disable can still restore configurations created by Code Switch.
-	{Key: "model_providers.code-switch.name", Path: []string{"model_providers", "code-switch", "name"}},
-	{Key: "model_providers.code-switch.base_url", Path: []string{"model_providers", "code-switch", "base_url"}},
-	{Key: "model_providers.code-switch.wire_api", Path: []string{"model_providers", "code-switch", "wire_api"}},
-	{Key: "model_providers.code-switch.requires_openai_auth", Path: []string{"model_providers", "code-switch", "requires_openai_auth"}},
 }
 
 var codexAuthFieldPaths = []string{codexEnvKey}
@@ -70,16 +63,11 @@ func (m *CodexManager) ProxyStatus() (platformproxydomain.Status, error) {
 		}
 		return status, err
 	}
-	providerKey := codexProviderKey
-	provider, ok := config.ModelProviders[providerKey]
-	if !ok {
-		providerKey = legacyCodexProviderKey
-		provider, ok = config.ModelProviders[providerKey]
-	}
+	provider, ok := config.ModelProviders[codexProviderKey]
 	if !ok {
 		return status, nil
 	}
-	if strings.EqualFold(config.ModelProvider, providerKey) && strings.EqualFold(provider.BaseURL, m.baseURL()) {
+	if strings.EqualFold(config.ModelProvider, codexProviderKey) && strings.EqualFold(provider.BaseURL, m.baseURL()) {
 		status.Enabled = true
 	}
 	return status, nil
@@ -219,10 +207,10 @@ func (m *CodexManager) DisableProxy() error {
 
 func (m *CodexManager) applyCodexDesiredConfig(data []byte) ([]byte, error) {
 	values := map[string]tomlFieldValue{
-		"model_provider":                               {Present: true, Raw: strconv.Quote(codexProviderKey)},
-		"model_providers.portico.name":                 {Present: true, Raw: strconv.Quote(codexProviderKey)},
-		"model_providers.portico.base_url":             {Present: true, Raw: strconv.Quote(m.baseURL())},
-		"model_providers.portico.wire_api":             {Present: true, Raw: strconv.Quote(codexWireAPI)},
+		"model_provider":                   {Present: true, Raw: strconv.Quote(codexProviderKey)},
+		"model_providers.portico.name":     {Present: true, Raw: strconv.Quote(codexProviderKey)},
+		"model_providers.portico.base_url": {Present: true, Raw: strconv.Quote(m.baseURL())},
+		"model_providers.portico.wire_api": {Present: true, Raw: strconv.Quote(codexWireAPI)},
 		// Codex 必须启用 OpenAI 认证，才会将 auth.json 中的占位密钥发给 relay。
 		"model_providers.portico.requires_openai_auth": {Present: true, Raw: "true"},
 	}
@@ -268,9 +256,8 @@ func codexContainerPresence(data []byte) (map[string]bool, error) {
 		return nil, err
 	}
 	presence := map[string]bool{
-		"model_providers":                           false,
-		"model_providers." + codexProviderKey:       false,
-		"model_providers." + legacyCodexProviderKey: false,
+		"model_providers":                     false,
+		"model_providers." + codexProviderKey: false,
 	}
 	providersValue, ok := root["model_providers"]
 	if !ok {
@@ -281,16 +268,14 @@ func codexContainerPresence(data []byte) (map[string]bool, error) {
 		return nil, errors.New("Codex model_providers 不是表，拒绝覆盖")
 	}
 	presence["model_providers"] = true
-	for _, key := range []string{codexProviderKey, legacyCodexProviderKey} {
-		providerValue, ok := providers[key]
-		if !ok {
-			continue
-		}
-		if _, ok := providerValue.(map[string]any); !ok {
-			return nil, fmt.Errorf("Codex model_providers.%s 不是表，拒绝覆盖", key)
-		}
-		presence["model_providers."+key] = true
+	providerValue, ok := providers[codexProviderKey]
+	if !ok {
+		return presence, nil
 	}
+	if _, ok := providerValue.(map[string]any); !ok {
+		return nil, fmt.Errorf("Codex model_providers.%s 不是表，拒绝覆盖", codexProviderKey)
+	}
+	presence["model_providers."+codexProviderKey] = true
 	return presence, nil
 }
 
@@ -368,9 +353,6 @@ func (m *CodexManager) codexConfigRestoreUpdate(path string, data []byte, curren
 	var prunePaths [][]string
 	if !snapshot.Containers["model_providers.portico"] {
 		prunePaths = append(prunePaths, []string{"model_providers", "portico"})
-	}
-	if !snapshot.Containers["model_providers.code-switch"] {
-		prunePaths = append(prunePaths, []string{"model_providers", "code-switch"})
 	}
 	if !snapshot.Containers["model_providers"] {
 		prunePaths = append(prunePaths, []string{"model_providers"})

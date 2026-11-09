@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"database/sql"
 	"log"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ func sharedPricingService() *modelpricing.Service {
 const statsCacheTTL = 5 * time.Minute
 
 type SQLiteQueries struct {
+	dbName  string
 	pricing *modelpricing.Service
 
 	statsCache         *ttlCache[observabilitydomain.LogStats]
@@ -40,6 +42,7 @@ type SQLiteQueries struct {
 	heatmapCache       *ttlCache[[]observabilitydomain.HeatmapStat]
 }
 
+// NewSQLiteQueries 使用应用的只读池。
 func NewSQLiteQueries() *SQLiteQueries {
 	return &SQLiteQueries{
 		pricing: sharedPricingService(),
@@ -49,6 +52,13 @@ func NewSQLiteQueries() *SQLiteQueries {
 		providerDailyCache: newTTLCache(5*time.Minute, cloneProviderDailyStats),
 		heatmapCache:       newTTLCache(5*time.Minute, cloneHeatmapStats),
 	}
+}
+
+func (q *SQLiteQueries) readDB() (*sql.DB, error) {
+	if q.dbName != "" {
+		return storage.DB(q.dbName)
+	}
+	return requestLogReadDB()
 }
 
 // decorateRequestLogCost 按当前定价表计算一条日志的费用明细与档位。

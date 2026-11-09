@@ -102,6 +102,10 @@ func (r *relaySessionRepoStub) GetProviderSessions(platform, providerName string
 	return nil, nil
 }
 
+func (r *relaySessionRepoStub) GetRecentPlatformSessions(platform string, limit int) ([]sessiondomain.SessionBinding, error) {
+	return nil, nil
+}
+
 func (r *relaySessionRepoStub) GetPlatformSessions(platform string) ([]sessiondomain.SessionBinding, error) {
 	return nil, nil
 }

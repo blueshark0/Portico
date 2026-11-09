@@ -5,11 +5,10 @@ import (
 )
 
 const (
-	DefaultRemotePath        = "/Portico"
-	RemoteSnapshotFile       = "portico.config.v1.enc.json"
-	LegacyRemoteSnapshotFile = "codeswitch.config.v1.enc.json"
-	LocalRollbackDirName     = "sync-backups"
-	SchemaVersion            = 1
+	DefaultRemotePath    = "/Portico"
+	RemoteSnapshotFile   = "portico.config.v1.enc.json"
+	LocalRollbackDirName = "sync-backups"
+	SchemaVersion        = 1
 )
 
 type SyncSettings struct {

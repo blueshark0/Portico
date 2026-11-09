@@ -72,3 +72,7 @@ func (s *Service) Statuses() []UpstreamStatus {
 func (s *Service) ToolCatalog() []ToolInfo {
 	return s.agg.ToolCatalog()
 }
+
+func (s *Service) RuntimeSnapshot(knownRevision uint64) GatewayRuntimeSnapshot {
+	return s.agg.RuntimeSnapshot(knownRevision)
+}

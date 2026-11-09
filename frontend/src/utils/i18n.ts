@@ -4,7 +4,6 @@ import { Locale, availableLocales, loadLocaleMessages } from '../locales'
 
 const defaultLocale: Locale = 'zh'
 const LOCALE_STORAGE_KEY = 'portico-locale'
-const LEGACY_LOCALE_STORAGE_KEY = 'code-switch-locale'
 const isBrowser = typeof window !== 'undefined'
 
 export const i18n = createI18n({
@@ -23,7 +22,6 @@ export function getStoredLocale(): Locale {
     return defaultLocale
   }
   const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY)
-    ?? window.localStorage.getItem(LEGACY_LOCALE_STORAGE_KEY)
   return isLocale(stored) ? stored : defaultLocale
 }
 

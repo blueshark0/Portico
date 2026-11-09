@@ -4,6 +4,7 @@ import {
   DEFAULT_LOG_HTTP_STATUS,
   DEFAULT_LOG_PAGE_SIZE,
   fetchRequestLogs,
+  fetchRequestLogsForExport,
   fetchLogProviders,
   fetchLogStats,
   LOG_PAGE_SIZE_OPTIONS,
@@ -25,7 +26,6 @@ type UseLogsDashboardOptions = {
 }
 
 const REFRESH_INTERVAL = 30
-const EXPORT_MAX_ROWS = 5000
 
 export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
   const logs = ref<RequestLog[]>([])
@@ -53,6 +53,7 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
   let timer: number | undefined
   let dashboardLoadPromise: Promise<void> | null = null
   let queuedDashboardReload = false
+  let disposed = false
   const rangeOptions = computed(() =>
     LOG_RANGE_OPTIONS.map((value) => ({
       value,
@@ -83,6 +84,7 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
   }
 
   const loadDashboard = (options: { skipIfLoading?: boolean } = {}) => {
+    if (disposed) return null
     if (dashboardLoadPromise) {
       return options.skipIfLoading ? null : dashboardLoadPromise
     }
@@ -113,6 +115,7 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
               return null
             }),
           ])
+          if (disposed) return
           summaryStats.value = statsData ?? null
           const nextLogs = logData?.items ?? []
           logs.value = nextLogs
@@ -125,11 +128,11 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
           } else {
             page.value = logData?.page ?? requestedPage
           }
-        } while (queuedDashboardReload)
+        } while (queuedDashboardReload && !disposed)
       } catch (error) {
         console.error('failed to load dashboard data', error)
       } finally {
-        loading.value = false
+        if (!disposed) loading.value = false
         dashboardLoadPromise = null
       }
     })()
@@ -138,8 +141,10 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
   }
 
   const loadProviderOptions = async () => {
+    if (disposed) return
     try {
       const list = await fetchLogProviders(filters.platform)
+      if (disposed) return
       providerOptions.value = list ?? []
       if (filters.provider && !providerOptions.value.includes(filters.provider)) {
         filters.provider = ''
@@ -158,6 +163,7 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
 
   const startCountdown = () => {
     stopCountdown()
+    if (disposed || document.hidden) return
     timer = window.setInterval(() => {
       if (countdown.value <= 1) {
         countdown.value = REFRESH_INTERVAL
@@ -221,30 +227,18 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
   }
 
-  // 导出当前筛选条件下的全部日志（分页拉取，封顶 EXPORT_MAX_ROWS 行）。
+  // 导出属于用户发起的一次性任务：离开页面也继续完成下载，不随页面卸载取消。
   const exportCsv = async () => {
     if (exporting.value) return
     exporting.value = true
     try {
-      const all: RequestLog[] = []
-      let exportPage = 1
-      // 用后端允许的最大页长，减少往返与每页重复的 COUNT。
-      const exportPageSize = 200
-      let total = 0
-      do {
-        const data = await fetchRequestLogs({
-          platform: filters.platform,
-          provider: filters.provider,
-          rangeKey: normalizeLogRangeKey(filters.rangeKey),
-          costTier: filters.costTier,
-          httpStatus: filters.httpStatus,
-          page: exportPage,
-          pageSize: exportPageSize,
-        })
-        all.push(...(data?.items ?? []))
-        total = data?.total ?? 0
-        exportPage += 1
-      } while (all.length < total && all.length < EXPORT_MAX_ROWS && exportPage <= 100)
+      const all = await fetchRequestLogsForExport({
+        platform: filters.platform,
+        provider: filters.provider,
+        rangeKey: normalizeLogRangeKey(filters.rangeKey),
+        costTier: filters.costTier,
+        httpStatus: filters.httpStatus,
+      })
 
       const header = 'id,created_at,platform,provider,model,session_id,http_code,ttft_sec,duration_sec,input_tokens,output_tokens,cache_create_tokens,cache_read_tokens,reasoning_tokens,total_cost'
       const lines = all.map((log) =>
@@ -295,11 +289,14 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
 
   onMounted(async () => {
     await Promise.all([loadDashboard(), loadProviderOptions()])
+    if (disposed) return
     startCountdown()
     document.addEventListener('visibilitychange', handleVisibilityChange)
   })
 
   onUnmounted(() => {
+    disposed = true
+    queuedDashboardReload = false
     stopCountdown()
     document.removeEventListener('visibilitychange', handleVisibilityChange)
   })

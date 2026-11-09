@@ -27,7 +27,7 @@ func (q *SQLiteQueries) HeatmapStats(days int) ([]observabilitydomain.HeatmapSta
 		rangeStart = rangeStart.Add(-time.Duration(totalHours-1) * time.Hour)
 	}
 
-	db, err := requestLogReadDB()
+	db, err := q.readDB()
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (q *SQLiteQueries) StatsSince(platform string, provider string, rangeKey st
 	}
 	seriesBuckets, bucketIndexes := newStatsSeriesBuckets(rangeSpec)
 
-	db, err := requestLogReadDB()
+	db, err := q.readDB()
 	if err != nil {
 		return stats, err
 	}
@@ -284,7 +284,7 @@ func (q *SQLiteQueries) ProviderDailyStats(platform string) ([]observabilitydoma
 	start := startOfDay(time.Now())
 	end := start.Add(24 * time.Hour)
 
-	db, err := requestLogReadDB()
+	db, err := q.readDB()
 	if err != nil {
 		return nil, err
 	}

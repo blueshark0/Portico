@@ -63,11 +63,9 @@ func (m *CodexManager) InjectMcp() error {
 		servers = make(map[string]any)
 	}
 	payload := m.mcpEntryPayload()
-	_, hasLegacy := servers[legacyMcpEntryName]
-	if reflect.DeepEqual(servers[mcpEntryName], payload) && !hasLegacy {
+	if reflect.DeepEqual(servers[mcpEntryName], payload) {
 		return nil
 	}
-	delete(servers, legacyMcpEntryName)
 	servers[mcpEntryName] = payload
 	raw["mcp_servers"] = servers
 	return m.writeRawConfig(settingsPath, raw)
@@ -89,13 +87,10 @@ func (m *CodexManager) RemoveMcp() error {
 		return err
 	}
 	servers, _ := raw["mcp_servers"].(map[string]any)
-	_, hasCurrent := servers[mcpEntryName]
-	_, hasLegacy := servers[legacyMcpEntryName]
-	if !hasCurrent && !hasLegacy {
+	if _, ok := servers[mcpEntryName]; !ok {
 		return nil
 	}
 	delete(servers, mcpEntryName)
-	delete(servers, legacyMcpEntryName)
 	if len(servers) == 0 {
 		delete(raw, "mcp_servers")
 	} else {

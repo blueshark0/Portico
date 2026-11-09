@@ -76,12 +76,19 @@ Grab a build from [**Releases**](https://github.com/blueshark0/Portico/releases/
 
 | Platform | Asset |
 | --- | --- |
+| Debian / Ubuntu · x86_64 | `portico-linux-amd64.deb` |
+| Fedora / RHEL · x86_64 | `portico-linux-amd64.rpm` |
+| Arch Linux · x86_64 | `portico-linux-amd64.pkg.tar.zst` |
+| Other Linux · x86_64 | `portico-linux-amd64.AppImage` |
+| Linux server (headless) · x86_64 | `portico-server-linux-amd64.tar.gz`, see [Headless server](#headless-server) |
+
+Releases currently target x86_64 Linux only. Other platforms can [build from source](#building-from-source). The packages need GTK 4.14 or newer and WebKitGTK 6.0, for example Ubuntu 24.04 or Debian 13.
+
+<!-- macOS and Windows releases are paused. Restore these rows and notes together with release.yml.
 | macOS · Apple Silicon | `portico-macos-arm64.zip` |
 | macOS · Intel | `portico-macos-amd64.zip` |
 | Windows · x64 installer | `Portico-amd64-installer.exe` |
 | Windows · x64 portable | `portico-windows-amd64-portable.zip` |
-| Linux server (headless) · x64 / arm64 | `portico-server-linux-amd64.tar.gz` / `portico-server-linux-arm64.tar.gz` — see [Headless server](#headless-server) |
-| Linux desktop | [Build from source](#building-from-source) |
 
 **macOS.** Unzip and move `Portico.app` to `/Applications`. Release builds are ad-hoc signed, not notarized, so Gatekeeper may refuse the first launch:
 
@@ -92,8 +99,7 @@ xattr -cr /Applications/Portico.app
 …or approve the app once under *System Settings → Privacy & Security*.
 
 **Windows.** The NSIS installer bootstraps the WebView2 runtime if needed; the portable build requires WebView2 to be installed already. Keep `Portico.exe` and `portico-server.exe` from the portable zip in the same folder — the desktop app starts the backend from there.
-
-**Upgrading from Code Switch.** On first launch Portico renames `~/.code-switch` to `~/.portico`, keeping your profiles, request logs and proxy state (an existing `~/.portico` is never touched). The legacy `code-switch` placeholder token is still accepted, so an existing CLI integration keeps working; re-enable it once to move fully to the new placeholder.
+-->
 
 ## Quick start
 
@@ -364,7 +370,7 @@ env ARCH=amd64 wails3 task windows:build
 env ARCH=amd64 wails3 task windows:package   # requires makensis
 ```
 
-Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds macOS (arm64, amd64) and Windows (amd64) desktop artifacts, Linux (amd64, arm64) server archives, and publishes a release. `scripts/publish_release.sh <tag> [notes-file]` is the equivalent local entry point.
+Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds x86_64 Linux desktop packages and a server archive and publishes a release. `scripts/publish_release.sh <tag> [notes-file]` is the equivalent local entry point.
 
 ## Project structure
 

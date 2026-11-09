@@ -55,7 +55,7 @@ func (m *GeminiManager) ProxyStatus() (platformproxydomain.Status, error) {
 	if err != nil {
 		return status, err
 	}
-	status.Enabled = isManagedPlaceholderToken(envMap["GEMINI_API_KEY"], geminiAPIKeyValue) &&
+	status.Enabled = strings.EqualFold(envMap["GEMINI_API_KEY"], geminiAPIKeyValue) &&
 		strings.EqualFold(envMap["GOOGLE_GEMINI_BASE_URL"], m.baseURL())
 	return status, nil
 }

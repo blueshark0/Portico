@@ -109,6 +109,9 @@ const syncMockActiveMapping = (provider: any) => {
   provider.modelMapping = active ? clone(active.mapping) : {}
 }
 
+let catalogRevision = 1
+let catalogFingerprint = ''
+
 // "{Facade}.{Method}" → handler；未知方法返回 null（与真实运行时「方法存在但零值」行为接近）。
 const handlers: Record<string, (...args: any[]) => any> = {
   // routingfacade
@@ -182,6 +185,8 @@ const handlers: Record<string, (...args: any[]) => any> = {
     const size = pageSize || 200
     return { items: clone(filtered.slice((p - 1) * size, p * size)), total: filtered.length, page: p, page_size: size }
   },
+  'ObservabilityFacade.ExportRequestLogs': (platform: string, provider: string, rangeKey: string, costTier: string, httpStatus: string) =>
+    clone(filterLogs(mockRequestLogs, platform, provider, rangeKey || 'last7days', costTier, httpStatus).slice(0, 5000)),
   'ObservabilityFacade.StatsSince': (platform: string, provider: string, rangeKey: string, costTier: string, httpStatus: string) => ({
     ...statsOf(filterLogs(mockRequestLogs, platform, provider, rangeKey || 'last7days', costTier, httpStatus)),
     series: seriesOf(filterLogs(mockRequestLogs, platform, provider, rangeKey || 'last7days', costTier, httpStatus)),
@@ -232,6 +237,13 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
 
   // sessionfacade
+  'SessionFacade.ListRecent': (limit: number) => clone(
+    ['claude', 'codex', 'gemini'].flatMap((platform) => mockSessions(platform))
+      .sort((a, b) => new Date(b.last_success_at).getTime() - new Date(a.last_success_at).getTime())
+      .slice(0, Math.min(limit > 0 ? limit : 5, 50))
+      .map(({ platform, session_id, provider_name, last_success_at, created_at }) =>
+        ({ platform, session_id, provider_name, last_success_at, created_at })),
+  ),
   'SessionFacade.ListByPlatform': (platform: string) => clone(mockSessions(platform)),
   'SessionFacade.Unbind': (platform: string, sessionID: string) => {
     for (let i = mockRequestLogs.length - 1; i >= 0; i--) {
@@ -254,6 +266,20 @@ const handlers: Record<string, (...args: any[]) => any> = {
   },
 
   // mcpgatewayfacade
+  'McpGatewayFacade.RuntimeSnapshot': (knownRevision: number) => {
+    const enabled = new Set(mockMcpServers.filter((server) => server.enabled).map((server) => server.id))
+    const tools = mockMcpTools.filter((tool) => enabled.has(tool.serverId))
+    const fingerprint = JSON.stringify(tools)
+    if (fingerprint !== catalogFingerprint) {
+      catalogFingerprint = fingerprint
+      catalogRevision += 1
+    }
+    const catalogChanged = knownRevision !== catalogRevision
+    return {
+      statuses: handlers['McpGatewayFacade.Statuses'](), catalogRevision, catalogChanged,
+      ...(catalogChanged ? { tools: clone(tools) } : {}),
+    }
+  },
   'McpGatewayFacade.List': () => clone(mockMcpServers),
   'McpGatewayFacade.Save': (server: any) => {
     if (server.id) {
@@ -288,8 +314,6 @@ const handlers: Record<string, (...args: any[]) => any> = {
       toolCount: server.enabled
         ? mockMcpTools.filter((tool) => tool.serverId === server.id).length
         : 0,
-      // 演示数据的工具集固定：启用即版本 1，禁用为 0（页面据此决定是否重拉工具）。
-      toolsRevision: server.enabled ? 1 : 0,
     })),
   'McpGatewayFacade.Endpoint': () => 'http://127.0.0.1:18100/mcp',
   'McpGatewayFacade.ListTools': () => clone(mockMcpTools),

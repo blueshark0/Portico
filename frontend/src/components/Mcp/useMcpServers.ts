@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, onUnmounted, reactive, ref, shallowRef } from 'vue'
 import {
   McpServer,
   ServerType,
@@ -6,7 +6,7 @@ import {
   fetchInjectionStatus,
   fetchMcpEndpoint,
   fetchMcpServers,
-  fetchMcpStatuses,
+  fetchMcpRuntimeSnapshot,
   injectMcp,
   removeMcpInjection,
   saveMcpServer,
@@ -15,6 +15,7 @@ import {
   type McpServerRecord,
   type TestResult,
   type UpstreamStatus,
+  type ToolInfo,
 } from '../../services/mcp'
 import { getErrorMessage } from '../../utils/errors'
 import { showToast } from '../../utils/toast'
@@ -104,6 +105,13 @@ export const validateServerName = (name: string): boolean =>
 export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
   const servers = ref<McpServerRecord[]>([])
   const statuses = ref<Record<number, UpstreamStatus>>({})
+  // 工具清单只会整体替换，且每项带完整 InputSchema，不需要深层响应式。
+  const tools = shallowRef<ToolInfo[]>([])
+  let catalogRevision = 0
+  let disposed = false
+  let runtimeLoadPromise: Promise<void> | null = null
+  let queuedRuntimeReload = false
+  onUnmounted(() => { disposed = true })
   const endpoint = ref('')
   const loading = ref(false)
   // claude/codex 各自的注入状态；null = 尚未加载
@@ -125,39 +133,67 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
     Object.values(statuses.value).reduce((sum, s) => sum + (s.toolCount || 0), 0),
   )
 
+  // 状态未变化时保留原对象：1Hz 轮询不应让依赖 statuses 的计算属性每秒重算。
   const applyStatuses = (list: UpstreamStatus[]) => {
+    const current = statuses.value
+    const unchanged =
+      list.length === Object.keys(current).length &&
+      list.every((st) => {
+        const known = current[st.serverId]
+        return known && known.state === st.state && known.toolCount === st.toolCount && known.error === st.error
+      })
+    if (unchanged) return
     const next: Record<number, UpstreamStatus> = {}
     for (const st of list) next[st.serverId] = st
     statuses.value = next
   }
 
-  const refreshStatuses = async () => {
-    const list = await runWithToast(() => fetchMcpStatuses(), {
-      fallback: t('components.mcp.messages.statusLoadFailed'),
-      silent: true,
-    })
-    if (list) applyStatuses(list)
+  // 进行中的请求可能早于刚完成的变更，默认补发一次；只有定时轮询才可以直接跳过。
+  const refreshStatuses = (options: { skipIfLoading?: boolean } = {}): Promise<void> => {
+    if (disposed) return Promise.resolve()
+    if (runtimeLoadPromise) {
+      if (!options.skipIfLoading) queuedRuntimeReload = true
+      return runtimeLoadPromise
+    }
+    runtimeLoadPromise = (async () => {
+      try {
+        do {
+          queuedRuntimeReload = false
+          const snapshot = await runWithToast(() => fetchMcpRuntimeSnapshot(catalogRevision), {
+            fallback: t('components.mcp.messages.statusLoadFailed'),
+            silent: true,
+          })
+          if (!snapshot || disposed) continue
+          applyStatuses(snapshot.statuses ?? [])
+          if (snapshot.catalogChanged) tools.value = snapshot.tools ?? []
+          catalogRevision = snapshot.catalogRevision
+        } while (queuedRuntimeReload && !disposed)
+      } finally {
+        runtimeLoadPromise = null
+      }
+    })()
+    return runtimeLoadPromise
   }
 
   const loadAll = async () => {
     loading.value = true
     try {
-      const [serverList, statusList, ep, claude, codex] = await Promise.all([
+      const [serverList, , ep, claude, codex] = await Promise.all([
         fetchMcpServers(),
-        fetchMcpStatuses(),
+        refreshStatuses(),
         fetchMcpEndpoint(),
         fetchInjectionStatus('claude'),
         fetchInjectionStatus('codex'),
       ])
+      if (disposed) return
       servers.value = serverList ?? []
-      applyStatuses(statusList ?? [])
       endpoint.value = ep
       injections.claude = claude
       injections.codex = codex
     } catch (error) {
-      showToast(getErrorMessage(error, t('components.mcp.messages.loadFailed')), 'error')
+      if (!disposed) showToast(getErrorMessage(error, t('components.mcp.messages.loadFailed')), 'error')
     } finally {
-      loading.value = false
+      if (!disposed) loading.value = false
     }
   }
 
@@ -333,6 +369,7 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
   return {
     servers,
     statuses,
+    tools,
     endpoint,
     loading,
     injections,

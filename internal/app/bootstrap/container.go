@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"sync"
@@ -46,9 +45,6 @@ type Container struct {
 }
 
 func Initialize(appVersion string) (*Container, error) {
-	if err := storage.MigrateLegacyAppDataDir(); err != nil {
-		return nil, fmt.Errorf("迁移旧版应用数据失败: %w", err)
-	}
 	logFile := logging.Setup()
 	if err := NewInitializer().Initialize(); err != nil {
 		if logFile != nil {
