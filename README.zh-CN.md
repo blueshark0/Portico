@@ -75,11 +75,18 @@ CLI 使用占位 token `portico` 向 relay 鉴权，**不会**写入你的真实
 
 | 平台 | 资产 |
 | --- | --- |
+| Debian / Ubuntu · x86_64 | `portico-linux-amd64.deb` |
+| Fedora / RHEL · x86_64 | `portico-linux-amd64.rpm` |
+| Arch Linux · x86_64 | `portico-linux-amd64.pkg.tar.zst` |
+| 其他 Linux · x86_64 | `portico-linux-amd64.AppImage` |
+
+当前只发布 x86_64 Linux 版本，其他平台可[从源码构建](#从源码构建)。安装包依赖 GTK 4 和 WebKitGTK 6.0。
+
+<!-- macOS 和 Windows 的发布暂时停用。恢复 release.yml 时一并恢复以下表格行和说明。
 | macOS · Apple Silicon | `portico-macos-arm64.zip` |
 | macOS · Intel | `portico-macos-amd64.zip` |
 | Windows · x64 安装包 | `Portico-amd64-installer.exe` |
 | Windows · x64 便携版 | `Portico.exe` |
-| Linux | [从源码构建](#从源码构建) |
 
 **macOS：** 解压后将 `Portico.app` 移入 `/Applications`。发布构建为 ad-hoc 签名、未经公证，Gatekeeper 可能阻止首次启动：
 
@@ -90,6 +97,7 @@ xattr -cr /Applications/Portico.app
 或在「系统设置 → 隐私与安全性」中允许打开一次。
 
 **Windows：** NSIS 安装包会在需要时引导安装 WebView2 运行时；便携版要求系统已安装 WebView2。
+-->
 
 **从 Code Switch 升级：** 首次启动时 Portico 会把 `~/.code-switch` 重命名为 `~/.portico`，保留你的供应商档案、请求日志与接入状态（已存在的 `~/.portico` 不会被覆盖）。旧的 `code-switch` 占位 token 仍然兼容，已有接入可继续工作；重新开关一次接入即可完全切换到新占位 token。
 
@@ -295,7 +303,7 @@ env ARCH=amd64 wails3 task windows:build
 env ARCH=amd64 wails3 task windows:package   # 需要 makensis
 ```
 
-推送 `v*` 标签会触发 [`.github/workflows/release.yml`](.github/workflows/release.yml)，构建 macOS（arm64、amd64）与 Windows（amd64）产物并发布 Release。`scripts/publish_release.sh <tag> [notes-file]` 是等价的本地入口。
+推送 `v*` 标签会触发 [`.github/workflows/release.yml`](.github/workflows/release.yml)，构建 x86_64 Linux 安装包并发布 Release。`scripts/publish_release.sh <tag> [notes-file]` 是等价的本地入口。
 
 ## 项目结构
 

@@ -75,11 +75,18 @@ Grab a build from [**Releases**](https://github.com/blueshark0/Portico/releases/
 
 | Platform | Asset |
 | --- | --- |
+| Debian / Ubuntu · x86_64 | `portico-linux-amd64.deb` |
+| Fedora / RHEL · x86_64 | `portico-linux-amd64.rpm` |
+| Arch Linux · x86_64 | `portico-linux-amd64.pkg.tar.zst` |
+| Other Linux · x86_64 | `portico-linux-amd64.AppImage` |
+
+Releases currently target x86_64 Linux only. Other platforms can [build from source](#building-from-source). The packages depend on GTK 4 and WebKitGTK 6.0.
+
+<!-- macOS and Windows releases are paused. Restore these rows and notes together with release.yml.
 | macOS · Apple Silicon | `portico-macos-arm64.zip` |
 | macOS · Intel | `portico-macos-amd64.zip` |
 | Windows · x64 installer | `Portico-amd64-installer.exe` |
 | Windows · x64 portable | `Portico.exe` |
-| Linux | [Build from source](#building-from-source) |
 
 **macOS.** Unzip and move `Portico.app` to `/Applications`. Release builds are ad-hoc signed, not notarized, so Gatekeeper may refuse the first launch:
 
@@ -90,6 +97,7 @@ xattr -cr /Applications/Portico.app
 …or approve the app once under *System Settings → Privacy & Security*.
 
 **Windows.** The NSIS installer bootstraps the WebView2 runtime if needed; the portable executable requires WebView2 to be installed already.
+-->
 
 **Upgrading from Code Switch.** On first launch Portico renames `~/.code-switch` to `~/.portico`, keeping your profiles, request logs and proxy state (an existing `~/.portico` is never touched). The legacy `code-switch` placeholder token is still accepted, so an existing CLI integration keeps working; re-enable it once to move fully to the new placeholder.
 
@@ -295,7 +303,7 @@ env ARCH=amd64 wails3 task windows:build
 env ARCH=amd64 wails3 task windows:package   # requires makensis
 ```
 
-Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds macOS (arm64, amd64) and Windows (amd64) artifacts and publishes a release. `scripts/publish_release.sh <tag> [notes-file]` is the equivalent local entry point.
+Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds x86_64 Linux packages and publishes a release. `scripts/publish_release.sh <tag> [notes-file]` is the equivalent local entry point.
 
 ## Project structure
 
