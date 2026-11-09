@@ -14,7 +14,7 @@ func (q *SQLiteQueries) ListSessionRequestLogs(platform string, sessionID string
 	if platform == "" || sessionID == "" {
 		return []observabilitydomain.RequestLog{}, nil
 	}
-	db, err := requestLogReadDB()
+	db, err := q.readDB()
 	if err != nil {
 		return nil, err
 	}

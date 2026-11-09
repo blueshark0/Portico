@@ -47,6 +47,10 @@ func (i *Initializer) Initialize() error {
 	if err := i.runMigrations(); err != nil {
 		log.Printf("数据迁移警告: %v\n", err)
 	}
+	if err := i.initReadConnections(); err != nil {
+		_ = storage.CloseConnections()
+		return fmt.Errorf("初始化 request_log 只读连接失败: %w", err)
+	}
 	i.initialized = true
 	i.runStartupMaintenanceAsync()
 	return nil

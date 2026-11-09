@@ -51,6 +51,10 @@ func (f *McpGatewayFacade) ListTools() []mcpapp.ToolInfo {
 	return f.mcpService.ToolCatalog()
 }
 
+func (f *McpGatewayFacade) RuntimeSnapshot(knownRevision uint64) mcpapp.GatewayRuntimeSnapshot {
+	return f.mcpService.RuntimeSnapshot(knownRevision)
+}
+
 // Endpoint 网关聚合端点地址，供 UI 展示/复制。
 func (f *McpGatewayFacade) Endpoint() string {
 	return f.endpoint

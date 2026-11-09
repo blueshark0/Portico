@@ -10,13 +10,13 @@ import (
 	"portico/internal/shared/storage"
 )
 
-func TestListRequestLogs_OrdersByCreatedAtDescWithIDTieBreak(t *testing.T) {
+func TestListRequestLogs_OrdersByIDDesc(t *testing.T) {
 	loc := time.FixedZone("UTC+8", 8*60*60)
 	now := time.Date(2026, time.March, 16, 12, 0, 0, 0, loc)
 	db := setupRangeQueryTestDB(t)
 	setRangeTestClock(t, now)
 
-	// 插入顺序与 created_at 顺序故意不一致；同一秒两条以 id 倒序排列。
+	// 插入顺序与 created_at 顺序故意不一致；分页始终按 id 倒序，避免迟到写入改变顺序。
 	seedRequestLog(t, db, time.Date(2026, time.March, 16, 9, 0, 0, 0, loc), "claude", "alpha", "m-0900")
 	seedRequestLog(t, db, time.Date(2026, time.March, 16, 11, 0, 0, 0, loc), "claude", "alpha", "m-1100-a")
 	seedRequestLog(t, db, time.Date(2026, time.March, 16, 10, 0, 0, 0, loc), "claude", "alpha", "m-1000")
@@ -30,19 +30,18 @@ func TestListRequestLogs_OrdersByCreatedAtDescWithIDTieBreak(t *testing.T) {
 	for _, item := range page.Items {
 		got = append(got, item.Model)
 	}
-	want := []string{"m-1100-b", "m-1100-a", "m-1000", "m-0900"}
+	want := []string{"m-1100-b", "m-1000", "m-1100-a", "m-0900"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("unexpected order: got %v want %v", got, want)
 	}
 }
 
-// 默认视图（不按平台/供应商过滤）的分页查询必须沿 created_at 索引直接取前 N 行，
-// 不能退化为把整个时间范围的行取出后再排序。
-func TestRequestLogListPageQuery_UsesIndexOrder(t *testing.T) {
+// 分页先在 CTE 中物化当前页 ID，再按主键读取这些宽行；过滤仍可走 created_at 索引。
+func TestRequestLogPageSQL_MaterializesIDsBeforeWideRows(t *testing.T) {
 	db := setupRangeQueryTestDB(t)
 	where, args := requestLogListWhere("", "", "last7days", "all", "all")
 	args = append(args, 200, 0)
-	rows, err := db.Query("EXPLAIN QUERY PLAN "+requestLogListPageQuery(where), args...)
+	rows, err := db.Query("EXPLAIN QUERY PLAN "+requestLogPageSQL(where), args...)
 	if err != nil {
 		t.Fatalf("explain: %v", err)
 	}
@@ -57,11 +56,11 @@ func TestRequestLogListPageQuery_UsesIndexOrder(t *testing.T) {
 		plan = append(plan, detail)
 	}
 	joined := strings.Join(plan, "\n")
-	if strings.Contains(joined, "TEMP B-TREE FOR ORDER BY") {
-		t.Fatalf("list query sorts the whole range instead of using index order:\n%s", joined)
-	}
 	if !strings.Contains(joined, "idx_request_log_created_at") {
-		t.Fatalf("expected list query to use idx_request_log_created_at:\n%s", joined)
+		t.Fatalf("expected page ID filtering to use idx_request_log_created_at:\n%s", joined)
+	}
+	if !strings.Contains(joined, "SEARCH request_log USING INTEGER PRIMARY KEY") {
+		t.Fatalf("expected wide rows to be fetched by primary key:\n%s", joined)
 	}
 }
 

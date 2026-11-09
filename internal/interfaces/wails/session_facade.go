@@ -6,6 +6,7 @@ import (
 
 	observabilitydomain "portico/internal/observability/domain"
 	sessionapp "portico/internal/sessions/application"
+	sessiondomain "portico/internal/sessions/domain"
 )
 
 // SessionUsageQuerier 返回指定平台有效会话的 request_log 聚合，见
@@ -36,6 +37,10 @@ type SessionFacade struct {
 
 func NewSessionFacade(service *sessionapp.Service, usage SessionUsageQuerier) *SessionFacade {
 	return &SessionFacade{service: service, usage: usage}
+}
+
+func (f *SessionFacade) ListRecent(limit int) ([]sessiondomain.SessionBinding, error) {
+	return f.service.ListRecent(limit)
 }
 
 func (f *SessionFacade) ListByPlatform(platform string) ([]SessionSummary, error) {

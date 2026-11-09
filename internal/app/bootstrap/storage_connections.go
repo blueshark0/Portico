@@ -51,3 +51,21 @@ func (i *Initializer) initConnections() error {
 func sqliteDSN(path string) string {
 	return storage.SQLiteDSN(path)
 }
+
+func (i *Initializer) initReadConnections() error {
+	path, err := storage.AppDataPath("request_log.db")
+	if err != nil {
+		return err
+	}
+	if err := storage.OpenConnection(storage.ConnectionConfig{
+		Name: storage.RequestLogReadDBName, Driver: "sqlite",
+		DSN: storage.SQLiteReadOnlyDSN(path), MaxOpenConn: 4, MaxIdleConn: 2,
+	}); err != nil {
+		return err
+	}
+	db, err := storage.DB(storage.RequestLogReadDBName)
+	if err != nil {
+		return err
+	}
+	return db.Ping()
+}

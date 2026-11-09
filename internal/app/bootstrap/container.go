@@ -106,7 +106,7 @@ func Initialize(appVersion string) (*Container, error) {
 	appLogPath, _ := storage.AppDataPath("app.log")
 
 	// 会话页需要 request_log 的会话级聚合，与观测 facade 共用同一查询实例。
-	obsQueries := observabilityinfra.NewSQLiteQueries()
+	obsQueries := observabilityinfra.NewSQLiteQueries(storage.RequestLogReadDBName)
 
 	return &Container{
 		logFile:       logFile,

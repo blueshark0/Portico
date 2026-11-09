@@ -96,6 +96,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Frontend regression tests
+        run: pnpm run test
+
       - name: Type-check and build
         run: pnpm run build
 

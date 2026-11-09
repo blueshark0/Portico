@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"context"
 	"database/sql"
 	"strings"
 
@@ -32,13 +33,18 @@ func (q *SQLiteQueries) ListRequestLogs(platform string, provider string, rangeK
 		Page:     page,
 		PageSize: pageSize,
 	}
-	db, err := requestLogReadDB()
+	db, err := q.readDB()
 	if err != nil {
 		return result, err
 	}
+	tx, err := db.BeginTx(context.Background(), &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return result, err
+	}
+	defer tx.Rollback()
 
 	where, args := requestLogListWhere(platform, provider, rangeKey, costTier, httpStatus)
-	if err := db.QueryRow("SELECT COUNT(*) FROM request_log"+where, args...).Scan(&result.Total); err != nil {
+	if err := tx.QueryRow("SELECT COUNT(*) FROM request_log"+where, args...).Scan(&result.Total); err != nil {
 		if isNoSuchTableErr(err) {
 			result.Total = 0
 			return result, nil
@@ -46,11 +52,13 @@ func (q *SQLiteQueries) ListRequestLogs(platform string, provider string, rangeK
 		return result, err
 	}
 	if result.Total == 0 {
-		return result, nil
+		return result, tx.Commit()
 	}
 
 	args = append(args, pageSize, (page-1)*pageSize)
-	items, err := q.queryRequestLogs(db, requestLogListPageQuery(where), args...)
+	// Materialize only IDs for sorting/pagination; fetch wide rows for this page
+	// alone. Preserve id ordering even for timestamps inserted out of order.
+	items, err := q.queryRequestLogs(tx, requestLogPageSQL(where), args...)
 	if err != nil {
 		if isNoSuchTableErr(err) {
 			result.Total = 0
@@ -59,17 +67,13 @@ func (q *SQLiteQueries) ListRequestLogs(platform string, provider string, rangeK
 		return result, err
 	}
 	result.Items = items
-	return result, nil
+	return result, tx.Commit()
 }
 
-// requestLogListPageQuery 按 created_at 倒序分页：WHERE 以 created_at 范围
-// 过滤，排序必须与之同列才能直接沿 idx_request_log_created_at 倒序取前 N 行；
-// 若按 id 排序，SQLite 需要把范围内所有行取出再排序（7 天数万行时每页数百毫秒）。
-// created_at 是请求结束入队的时刻，入队与落库同序，因此与旧的 id 倒序基本一致，
-// 同一秒内再以 id 倒序打破平局，保证分页稳定。
-func requestLogListPageQuery(where string) string {
-	return "SELECT " + requestLogSelectColumns + " FROM request_log" + where +
-		" ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"
+func requestLogPageSQL(where string) string {
+	return "WITH page_ids AS MATERIALIZED (SELECT id FROM request_log" + where +
+		" ORDER BY id DESC LIMIT ? OFFSET ?) SELECT " + requestLogSelectColumns +
+		" FROM request_log WHERE id IN (SELECT id FROM page_ids) ORDER BY id DESC"
 }
 
 func requestLogListWhere(platform, provider, rangeKey, costTier, httpStatus string) (string, []any) {
@@ -93,7 +97,11 @@ func requestLogListWhere(platform, provider, rangeKey, costTier, httpStatus stri
 	return where, args
 }
 
-func (q *SQLiteQueries) queryRequestLogs(db *sql.DB, query string, args ...any) ([]observabilitydomain.RequestLog, error) {
+type requestLogQuerier interface {
+	Query(string, ...any) (*sql.Rows, error)
+}
+
+func (q *SQLiteQueries) queryRequestLogs(db requestLogQuerier, query string, args ...any) ([]observabilitydomain.RequestLog, error) {
 	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -133,7 +141,7 @@ func (q *SQLiteQueries) queryRequestLogs(db *sql.DB, query string, args ...any) 
 }
 
 func (q *SQLiteQueries) ListProviders(platform string) ([]string, error) {
-	db, err := requestLogReadDB()
+	db, err := q.readDB()
 	if err != nil {
 		return nil, err
 	}
