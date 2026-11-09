@@ -34,6 +34,10 @@ type Options struct {
 	Version string
 	// ServerBinary 为空时取可执行文件同目录下的 portico-server。
 	ServerBinary string
+	// AppImageDir 是 AppImage 的挂载目录，为空时取 APPDIR 环境变量。
+	AppImageDir string
+	// ServerInstallDir 是 AppImage 内后端的复制目标，为空时使用 ~/.portico/bin。
+	ServerInstallDir string
 	// RuntimeInfoPath / TokenPath 为空时使用 ~/.portico 下的默认位置。
 	RuntimeInfoPath string
 	TokenPath       string
@@ -239,6 +243,21 @@ func (m *Manager) waitUntilDown(ctx context.Context, adminURL string) error {
 }
 
 func (m *Manager) serverBinary() (string, error) {
+	binary, err := m.locateServerBinary()
+	if err != nil {
+		return "", err
+	}
+	appDir := m.opts.AppImageDir
+	if appDir == "" {
+		appDir = os.Getenv("APPDIR")
+	}
+	if appDir != "" && isWithinDir(binary, appDir) {
+		return m.installBundledServer(binary)
+	}
+	return binary, nil
+}
+
+func (m *Manager) locateServerBinary() (string, error) {
 	if m.opts.ServerBinary != "" {
 		return m.opts.ServerBinary, nil
 	}
@@ -267,6 +286,11 @@ func spawnDetached(binary string) (<-chan error, error) {
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
+	if appDir := os.Getenv("APPDIR"); appDir != "" {
+		// AppRun 把工作目录切到了挂载点内，后端不能留在那里。
+		cmd.Dir = filepath.Dir(binary)
+		cmd.Env = append(cleanAppImageEnv(os.Environ(), appDir), "PWD="+cmd.Dir)
+	}
 	configureDetached(cmd)
 	if err := cmd.Start(); err != nil {
 		return nil, err
