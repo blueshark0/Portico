@@ -2,6 +2,7 @@ package relay
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -167,3 +168,76 @@ func TestWriteBufferedUpstreamResponseKeepsJSONHookWhole(t *testing.T) {
 		t.Fatalf("body = %q, want %q", recorder.Body.String(), payload)
 	}
 }
+
+// 非流式响应边读边转发：上游还没发完时客户端已经收到前半段，
+// hook 仍在结束后一次性拿到完整 body。
+func TestWriteBufferedUpstreamResponseForwardsBeforeUpstreamFinishes(t *testing.T) {
+	pr, pw := io.Pipe()
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       pr,
+	}
+	writer := newFlushCaptureWriter()
+	var chunks [][]byte
+	done := make(chan error, 1)
+	go func() {
+		_, err := writeUpstreamResponse(writer, resp, func(data []byte) (bool, []byte) {
+			chunks = append(chunks, append([]byte(nil), data...))
+			return true, data
+		})
+		done <- err
+	}()
+
+	first := `{"usage":{"input_tokens":11},`
+	if _, err := pw.Write([]byte(first)); err != nil {
+		t.Fatal(err)
+	}
+	waitSignal(t, writer.writes, "前半段转发")
+	if got, _ := writer.snapshot(); got != first {
+		t.Fatalf("client body before upstream finished = %q, want %q", got, first)
+	}
+	if len(chunks) != 0 {
+		t.Fatalf("hook must not see a partial JSON body, got %q", chunks)
+	}
+
+	rest := `"output":"done"}`
+	if _, err := pw.Write([]byte(rest)); err != nil {
+		t.Fatal(err)
+	}
+	_ = pw.Close()
+	if err := <-done; err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+	if len(chunks) != 1 || string(chunks[0]) != first+rest {
+		t.Fatalf("hook chunks = %q, want one complete body", chunks)
+	}
+	if got, _ := writer.snapshot(); got != first+rest {
+		t.Fatalf("client body = %q", got)
+	}
+}
+
+func TestWriteBufferedUpstreamResponseReportsReadErrorAfterObserving(t *testing.T) {
+	readErr := io.ErrUnexpectedEOF
+	resp := &http.Response{
+		StatusCode: http.StatusBadGateway,
+		Header:     http.Header{},
+		Body:       io.NopCloser(io.MultiReader(strings.NewReader("partial"), &errReader{err: readErr})),
+	}
+	recorder := httptest.NewRecorder()
+	var seen string
+	_, err := writeBufferedUpstreamResponse(recorder, resp, func(data []byte) (bool, []byte) {
+		seen = string(data)
+		return true, data
+	})
+	if err == nil || !errors.Is(err, readErr) {
+		t.Fatalf("expected wrapped read error, got %v", err)
+	}
+	if seen != "partial" || recorder.Body.String() != "partial" {
+		t.Fatalf("hook saw %q, client got %q; want both partial", seen, recorder.Body.String())
+	}
+}
+
+type errReader struct{ err error }
+
+func (r *errReader) Read([]byte) (int, error) { return 0, r.err }

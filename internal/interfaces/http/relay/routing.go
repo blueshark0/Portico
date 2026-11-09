@@ -203,14 +203,14 @@ func (s *Server) handleSuccessfulSession(kind, sessionID, providerName string, a
 			relayWarnf("绑定会话失败: %v", err)
 			return
 		}
-		s.recordCodexSessionVisibility(kind, sessionID, backgroundTask)
+		s.recordCodexSessionVisibility(kind, sessionID, backgroundTask, generation)
 		return
 	}
 	currentGeneration, persist := s.sessionCache.RecordSessionSuccessGeneration(kind, sessionID, providerName, generation)
 	if !currentGeneration {
 		return
 	}
-	s.recordCodexSessionVisibility(kind, sessionID, backgroundTask)
+	s.recordCodexSessionVisibility(kind, sessionID, backgroundTask, generation)
 	if !persist {
 		return
 	}
@@ -223,11 +223,20 @@ func (s *Server) handleSuccessfulSession(kind, sessionID, providerName string, a
 	}
 }
 
-func (s *Server) recordCodexSessionVisibility(kind, sessionID string, backgroundTask bool) {
-	if kind != kernel.PlatformCodex.String() || s.sessionService == nil {
+// recordCodexSessionVisibility 经由会话缓存记录可见性：同一会话可见性不变时
+// 不再在请求 goroutine 里同步写 SQLite（只在首次分类或后台→主会话时写一次）。
+func (s *Server) recordCodexSessionVisibility(kind, sessionID string, backgroundTask bool, generation uint64) {
+	if kind != kernel.PlatformCodex.String() {
 		return
 	}
-	if err := s.sessionService.RecordSessionBackground(kind, sessionID, backgroundTask); err != nil {
+	var err error
+	switch {
+	case s.sessionCache != nil:
+		err = s.sessionCache.RecordSessionBackground(kind, sessionID, backgroundTask, generation)
+	case s.sessionService != nil:
+		err = s.sessionService.RecordSessionBackground(kind, sessionID, backgroundTask)
+	}
+	if err != nil {
 		relayWarnf("更新 Codex 会话可见性失败: %v", err)
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	observabilitydomain "portico/internal/observability/domain"
-	"portico/internal/shared/storage"
 )
 
 const requestLogSelectColumns = `
@@ -33,7 +32,7 @@ func (q *SQLiteQueries) ListRequestLogs(platform string, provider string, rangeK
 		Page:     page,
 		PageSize: pageSize,
 	}
-	db, err := storage.DB(storage.RequestLogDBName)
+	db, err := requestLogReadDB()
 	if err != nil {
 		return result, err
 	}
@@ -51,10 +50,7 @@ func (q *SQLiteQueries) ListRequestLogs(platform string, provider string, rangeK
 	}
 
 	args = append(args, pageSize, (page-1)*pageSize)
-	items, err := q.queryRequestLogs(db,
-		"SELECT "+requestLogSelectColumns+" FROM request_log"+where+" ORDER BY id DESC LIMIT ? OFFSET ?",
-		args...,
-	)
+	items, err := q.queryRequestLogs(db, requestLogListPageQuery(where), args...)
 	if err != nil {
 		if isNoSuchTableErr(err) {
 			result.Total = 0
@@ -64,6 +60,16 @@ func (q *SQLiteQueries) ListRequestLogs(platform string, provider string, rangeK
 	}
 	result.Items = items
 	return result, nil
+}
+
+// requestLogListPageQuery 按 created_at 倒序分页：WHERE 以 created_at 范围
+// 过滤，排序必须与之同列才能直接沿 idx_request_log_created_at 倒序取前 N 行；
+// 若按 id 排序，SQLite 需要把范围内所有行取出再排序（7 天数万行时每页数百毫秒）。
+// created_at 是请求结束入队的时刻，入队与落库同序，因此与旧的 id 倒序基本一致，
+// 同一秒内再以 id 倒序打破平局，保证分页稳定。
+func requestLogListPageQuery(where string) string {
+	return "SELECT " + requestLogSelectColumns + " FROM request_log" + where +
+		" ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?"
 }
 
 func requestLogListWhere(platform, provider, rangeKey, costTier, httpStatus string) (string, []any) {
@@ -127,7 +133,7 @@ func (q *SQLiteQueries) queryRequestLogs(db *sql.DB, query string, args ...any) 
 }
 
 func (q *SQLiteQueries) ListProviders(platform string) ([]string, error) {
-	db, err := storage.DB(storage.RequestLogDBName)
+	db, err := requestLogReadDB()
 	if err != nil {
 		return nil, err
 	}

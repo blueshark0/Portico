@@ -51,7 +51,11 @@ type UpstreamStatus struct {
 	ServerID  int64  `json:"serverId"`
 	State     string `json:"state"`
 	ToolCount int    `json:"toolCount"`
-	Error     string `json:"error,omitempty"`
+	// ToolsRevision 在该上游已发布工具每次变化（注册/刷新/摘除）时改变，
+	// 取值全局单调、不会重复：UI 轮询状态时据此判断是否需要重新拉取 ToolCatalog，
+	// 不必每秒拉一遍包含 InputSchema 的完整工具清单。
+	ToolsRevision int64  `json:"toolsRevision"`
+	Error         string `json:"error,omitempty"`
 }
 
 // ToolInfo 单个已发布工具的快照，供 UI 工具清单与诊断页展示。
@@ -93,6 +97,7 @@ type upstream struct {
 	err         string
 	toolNames   []string
 	toolDetails []ToolInfo // 与 toolNames 同生共灭：注册时填充、摘除时清空
+	toolsRev    int64      // 工具集版本，取自 Aggregator.toolsSeq，见 UpstreamStatus.ToolsRevision
 	backoffIdx  int
 	nextRetry   time.Time
 	generation  int64 // 全局代际号，防止迟到的连接结果落在已变更的记录上
@@ -109,10 +114,12 @@ type Aggregator struct {
 	ups    map[int64]*upstream
 	tools  map[string]toolRef
 	genSeq int64
-	closed bool          // Close 后置位，阻止一切新连接/注册
-	syncCh chan struct{} // cap 1，合并连续变更
-	stopCh chan struct{}
-	wg     sync.WaitGroup
+	// toolsSeq 为各上游 toolsRev 提供全局单调值：记录被删除重建后版本也不会回到旧值。
+	toolsSeq int64
+	closed   bool          // Close 后置位，阻止一切新连接/注册
+	syncCh   chan struct{} // cap 1，合并连续变更
+	stopCh   chan struct{}
+	wg       sync.WaitGroup
 
 	now func() time.Time // 测试钩子
 }
@@ -426,6 +433,7 @@ func (a *Aggregator) finishConnect(id int64, gen int64, session UpstreamSession,
 // serverID 占用）→ 跳过并 log，先注册者保留——避免后者静默替换前者 handler、
 // 以及任一上游被禁用时误删共享公共名对应的工具。
 func (a *Aggregator) registerToolsLocked(up *upstream, tools []*mcp.Tool) {
+	a.bumpToolsRevLocked(up)
 	seen := make(map[string]bool, len(tools))
 	for _, tool := range tools {
 		public := domain.PublicToolName(up.cfg.Name, tool.Name)
@@ -532,6 +540,7 @@ func (a *Aggregator) detachLocked(up *upstream) {
 	a.genSeq++
 	up.generation = a.genSeq
 	if len(up.toolNames) > 0 {
+		a.bumpToolsRevLocked(up)
 		a.mcpServer.RemoveTools(up.toolNames...)
 		for _, name := range up.toolNames {
 			delete(a.tools, name)
@@ -548,6 +557,12 @@ func (a *Aggregator) detachLocked(up *upstream) {
 			_ = session.Close() // stdio：SDK 已实现 stdin 关闭→5s→SIGTERM→SIGKILL
 		}()
 	}
+}
+
+// bumpToolsRevLocked 标记上游工具集已变化。调用方必须持有 a.mu。
+func (a *Aggregator) bumpToolsRevLocked(up *upstream) {
+	a.toolsSeq++
+	up.toolsRev = a.toolsSeq
 }
 
 // teardownLocked 摘除连接并删除记录。调用方必须持有 a.mu。
@@ -647,10 +662,11 @@ func (a *Aggregator) Statuses() []UpstreamStatus {
 	statuses := make([]UpstreamStatus, 0, len(a.ups))
 	for id, up := range a.ups {
 		statuses = append(statuses, UpstreamStatus{
-			ServerID:  id,
-			State:     up.state,
-			ToolCount: len(up.toolNames),
-			Error:     up.err,
+			ServerID:      id,
+			State:         up.state,
+			ToolCount:     len(up.toolNames),
+			ToolsRevision: up.toolsRev,
+			Error:         up.err,
 		})
 	}
 	return statuses

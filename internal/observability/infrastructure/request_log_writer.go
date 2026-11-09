@@ -154,5 +154,6 @@ func insertRequestLogs(logs []*observabilitydomain.RequestLog) error {
 		return err
 	}
 	committed = true
+	markRequestLogDataChanged()
 	return nil
 }
