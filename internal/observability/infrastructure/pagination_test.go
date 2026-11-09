@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ func paginationFixture(t testing.TB, count int) (*sql.DB, *SQLiteQueries, string
 	if err != nil {
 		t.Fatal(err)
 	}
-	return db, NewSQLiteQueries(name), path
+	return db, newSQLiteQueriesOn(name), path
 }
 
 func TestDeferredPaginationMatchesOriginalOrderingAndFilters(t *testing.T) {
@@ -77,7 +78,7 @@ func TestLogQueriesUseIndependentReadPool(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = storage.CloseConnection(readName) })
-	// Occupy the entire writer pool. The query must still finish via the reader.
+	// 占住整个写入池，查询仍必须能经只读池完成。
 	conn, err := db.Conn(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +86,7 @@ func TestLogQueriesUseIndependentReadPool(t *testing.T) {
 	defer conn.Close()
 	finished := make(chan error, 1)
 	go func() {
-		_, err := NewSQLiteQueries(readName).ListRequestLogs("", "", "last7days", "all", "all", 1, 200)
+		_, err := newSQLiteQueriesOn(readName).ListRequestLogs("", "", "last7days", "all", "all", 1, 200)
 		finished <- err
 	}()
 	select {
@@ -156,5 +157,85 @@ func BenchmarkRequestLogPagination(b *testing.B) {
 				}
 			})
 		})
+	}
+}
+
+func TestExportRequestLogsAppliesFiltersOrderAndCap(t *testing.T) {
+	setRangeTestClock(t, time.Date(2026, 11, 6, 19, 0, 0, 0, time.FixedZone("UTC+8", 8*3600)))
+	db, q, _ := paginationFixture(t, requestLogExportMaxRows+500)
+	all, err := q.ExportRequestLogs("", "", "last7days", "all", "all")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != requestLogExportMaxRows {
+		t.Fatalf("expected cap %d, got %d", requestLogExportMaxRows, len(all))
+	}
+	seen := make(map[int64]bool, len(all))
+	for i, item := range all {
+		if seen[item.ID] {
+			t.Fatalf("duplicate row %d", item.ID)
+		}
+		seen[item.ID] = true
+		if i > 0 && (item.CreatedAt > all[i-1].CreatedAt || (item.CreatedAt == all[i-1].CreatedAt && item.ID > all[i-1].ID)) {
+			t.Fatalf("not ordered by created_at, id desc at %d", i)
+		}
+	}
+	filtered, err := q.ExportRequestLogs("claude", "alpha", "last7days", "all", "failed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	where, args := requestLogListWhere("claude", "alpha", "last7days", "all", "failed")
+	var want int
+	if err := db.QueryRow("SELECT COUNT(*) FROM request_log"+where, args...).Scan(&want); err != nil {
+		t.Fatal(err)
+	}
+	if want == 0 || len(filtered) != want {
+		t.Fatalf("filtered export: got %d want %d", len(filtered), want)
+	}
+	for _, item := range filtered {
+		if item.Platform != "claude" || item.Provider != "alpha" || item.HttpCode < 400 {
+			t.Fatalf("filter leaked %+v", item)
+		}
+	}
+}
+
+func TestListProvidersSkipsAlongIndex(t *testing.T) {
+	db, q, _ := paginationFixture(t, 500)
+	if _, err := db.Exec(`INSERT INTO request_log(platform, provider, created_at) VALUES
+		('claude', '', '2026-01-01 00:00:00'), ('claude', NULL, '2026-01-01 00:00:00'),
+		('gemini', 'zeta', '2026-01-01 00:00:00'), ('claude', 'gamma', '2026-01-01 00:00:00')`); err != nil {
+		t.Fatal(err)
+	}
+	for platform, want := range map[string][]string{
+		"":        {"alpha", "beta", "gamma", "zeta"},
+		"claude":  {"alpha", "beta", "gamma"},
+		"gemini":  {"zeta"},
+		"missing": {},
+	} {
+		got, err := q.ListProviders(platform)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("platform %q: got %v want %v", platform, got, want)
+		}
+		query, args := requestLogProvidersSQL(platform)
+		rows, err := db.Query("EXPLAIN QUERY PLAN "+query, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			var id, parent, unused int
+			var detail string
+			if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(detail, "SCAN request_log") {
+				t.Fatalf("platform %q scans the whole table or index: %s", platform, detail)
+			}
+		}
+		if err := rows.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

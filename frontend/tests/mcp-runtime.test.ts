@@ -118,3 +118,55 @@ describe('MCP incremental runtime', () => {
     expect(api.snapshot).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('MCP status refresh after mutations', () => {
+  function harness() {
+    let state!: ReturnType<typeof useMcpServers>
+    const wrapper = mount(defineComponent({ setup() {
+      state = useMcpServers((s) => s)
+      return () => h('div')
+    } }))
+    return { state, wrapper }
+  }
+  const snapshotOf = (state: string) => ({
+    statuses: [{ serverId: 1, state, toolCount: 0 }], catalogRevision: 1, catalogChanged: false,
+  })
+
+  it('refetches after a mutation that overlaps an in-flight poll', async () => {
+    const { state, wrapper } = harness()
+    const pending = deferred<ReturnType<typeof snapshotOf>>()
+    api.snapshot.mockReturnValueOnce(pending.promise)
+    const poll = state.refreshStatuses({ skipIfLoading: true })
+    api.snapshot.mockResolvedValueOnce(snapshotOf('disabled'))
+    void state.refreshStatuses()
+    pending.resolve(snapshotOf('connected'))
+    await poll
+    expect(api.snapshot).toHaveBeenCalledTimes(2)
+    expect(state.statuses.value[1].state).toBe('disabled')
+    wrapper.unmount()
+  })
+  it('does not queue extra requests for overlapping polls', async () => {
+    const { state, wrapper } = harness()
+    const pending = deferred<ReturnType<typeof snapshotOf>>()
+    api.snapshot.mockReturnValueOnce(pending.promise)
+    const poll = state.refreshStatuses({ skipIfLoading: true })
+    void state.refreshStatuses({ skipIfLoading: true })
+    pending.resolve(snapshotOf('connected'))
+    await poll
+    expect(api.snapshot).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+  it('keeps the statuses object when polling returns the same content', async () => {
+    const { state, wrapper } = harness()
+    api.snapshot.mockResolvedValue(snapshotOf('connected'))
+    await state.refreshStatuses()
+    const known = state.statuses.value
+    await state.refreshStatuses()
+    expect(state.statuses.value).toBe(known)
+    api.snapshot.mockResolvedValue(snapshotOf('failed'))
+    await state.refreshStatuses()
+    expect(state.statuses.value).not.toBe(known)
+    expect(state.statuses.value[1].state).toBe('failed')
+    wrapper.unmount()
+  })
+})

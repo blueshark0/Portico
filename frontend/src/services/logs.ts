@@ -1,5 +1,6 @@
 import {
   HeatmapStats,
+  ExportRequestLogs,
   ListProviders,
   ListRequestLogs,
   ProviderDailyStats,
@@ -93,6 +94,17 @@ export const fetchRequestLogs = async (query: RequestLogQuery = {}): Promise<Req
   const page = Math.max(1, Math.floor(query.page ?? 1))
   const pageSize = normalizeLogPageSize(query.pageSize)
   return ListRequestLogs(platform, provider, rangeKey, costTier, httpStatus, page, pageSize)
+}
+
+// 导出当前筛选条件下的日志：后端一次查询取回，行数上限也由后端决定。
+export const fetchRequestLogsForExport = async (query: RequestLogQuery = {}): Promise<RequestLog[]> => {
+  return ExportRequestLogs(
+    query.platform ?? '',
+    query.provider ?? '',
+    normalizeLogRangeKey(query.rangeKey),
+    normalizeLogCostTier(query.costTier),
+    normalizeLogHttpStatus(query.httpStatus),
+  )
 }
 
 export const fetchLogProviders = async (platform = ''): Promise<string[]> => {

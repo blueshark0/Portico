@@ -138,15 +138,7 @@ func EnsureRequestLogTableWithDB(db *sql.DB) error {
 	}); err != nil {
 		return err
 	}
-	// Keep startup checks proportional to rows still needing a cost. Creating
-	// this index scans historical data once; completed rows leave it immediately.
-	if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_request_log_unpriced ON request_log(id) WHERE total_cost IS NULL"); err != nil {
-		return err
-	}
 	if _, err := db.Exec("UPDATE request_log SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL OR created_at = ''"); err != nil {
-		return err
-	}
-	if err := backfillRequestLogCosts(db, sharedPricingService()); err != nil {
 		return err
 	}
 
@@ -163,6 +155,28 @@ func EnsureRequestLogTableWithDB(db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+// ensureRequestLogUnpricedIndex 让启动检查只与待回填行数成正比：建索引时全表扫描
+// 一次，之后行回填完成就立刻离开这个部分索引。
+func ensureRequestLogUnpricedIndex(db *sql.DB) error {
+	requestLogWriteMu.Lock()
+	defer requestLogWriteMu.Unlock()
+	_, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_request_log_unpriced ON request_log(id) WHERE total_cost IS NULL")
+	return err
+}
+
+// RunRequestLogCostMaintenance 建立待回填索引并回填历史费用。首次升级时耗时与历史
+// 数据量成正比，因此由启动后的后台维护调用，不阻塞窗口出现；中途退出下次启动继续。
+func RunRequestLogCostMaintenance() error {
+	db, err := storage.DB(storage.RequestLogDBName)
+	if err != nil {
+		return err
+	}
+	if err := ensureRequestLogUnpricedIndex(db); err != nil {
+		return err
+	}
+	return backfillRequestLogCosts(db, sharedPricingService())
 }
 
 // backfillRequestLogCosts 为补列前写入的历史行（total_cost IS NULL）按当前
@@ -232,6 +246,8 @@ func readRequestLogCostBatch(db *sql.DB, pricing *modelpricing.Service, afterID 
 }
 
 func writeRequestLogCostBatch(db *sql.DB, updates []requestLogCostUpdate) error {
+	requestLogWriteMu.Lock()
+	defer requestLogWriteMu.Unlock()
 	tx, err := db.Begin()
 	if err != nil {
 		return err

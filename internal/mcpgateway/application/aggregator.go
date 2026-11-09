@@ -52,11 +52,7 @@ type UpstreamStatus struct {
 	ServerID  int64  `json:"serverId"`
 	State     string `json:"state"`
 	ToolCount int    `json:"toolCount"`
-	// ToolsRevision 在该上游已发布工具每次变化（注册/刷新/摘除）时改变，
-	// 取值全局单调、不会重复：UI 轮询状态时据此判断是否需要重新拉取 ToolCatalog，
-	// 不必每秒拉一遍包含 InputSchema 的完整工具清单。
-	ToolsRevision int64  `json:"toolsRevision"`
-	Error         string `json:"error,omitempty"`
+	Error     string `json:"error,omitempty"`
 }
 
 // ToolInfo 单个已发布工具的快照，供 UI 工具清单与诊断页展示。
@@ -72,8 +68,8 @@ type ToolInfo struct {
 	Destructive  bool   `json:"destructive"`
 }
 
-// GatewayRuntimeSnapshot omits the full catalog when the caller already has it.
-// CatalogChanged also distinguishes an emptied catalog from an unchanged one.
+// GatewayRuntimeSnapshot 在调用方已持有最新目录时省略完整工具清单，避免 UI 每次
+// 轮询都传输 InputSchema。CatalogChanged 用于区分“目录被清空”和“目录未变化”。
 type GatewayRuntimeSnapshot struct {
 	Statuses        []UpstreamStatus `json:"statuses"`
 	CatalogRevision uint64           `json:"catalogRevision"`
@@ -107,7 +103,6 @@ type upstream struct {
 	err         string
 	toolNames   []string
 	toolDetails []ToolInfo // 与 toolNames 同生共灭：注册时填充、摘除时清空
-	toolsRev    int64      // 工具集版本，取自 Aggregator.toolsSeq，见 UpstreamStatus.ToolsRevision
 	backoffIdx  int
 	nextRetry   time.Time
 	generation  int64 // 全局代际号，防止迟到的连接结果落在已变更的记录上
@@ -120,14 +115,13 @@ type Aggregator struct {
 	mcpServer *mcp.Server
 	handler   http.Handler
 
-	mu     sync.Mutex
-	ups    map[int64]*upstream
-	tools  map[string]toolRef
-	genSeq int64
-	// toolsSeq 为各上游 toolsRev 提供全局单调值：记录被删除重建后版本也不会回到旧值。
-	toolsSeq        int64
+	mu              sync.Mutex
+	ups             map[int64]*upstream
+	tools           map[string]toolRef
+	genSeq          int64
 	catalogRevision uint64
 	catalog         []ToolInfo
+	catalogDirty    bool          // 有工具被摘除、目录尚未重建，见 flushCatalogLocked
 	closed          bool          // Close 后置位，阻止一切新连接/注册
 	syncCh          chan struct{} // cap 1，合并连续变更
 	stopCh          chan struct{}
@@ -150,7 +144,7 @@ type AggregatorOptions struct {
 // NewAggregator 创建聚合器；opts 零值可用（默认 connector、无版本号）。
 func NewAggregator(repo Repository, opts AggregatorOptions) *Aggregator {
 	a := &Aggregator{
-		catalogRevision: 1, // revision zero always requests an initial snapshot
+		catalogRevision: 1, // 版本 0 留给“尚无快照”的调用方，保证首次轮询必定拿到目录
 		repo:            repo,
 		ups:             make(map[int64]*upstream),
 		tools:           make(map[string]toolRef),
@@ -349,6 +343,7 @@ func (a *Aggregator) syncOnce(ctx context.Context) error {
 		}
 		a.teardownLocked(id) // 已删除
 	}
+	a.flushCatalogLocked()
 	for id, cfg := range desired {
 		up, ok := a.ups[id]
 		if !ok {
@@ -435,11 +430,12 @@ func (a *Aggregator) finishConnect(id int64, gen int64, session UpstreamSession,
 	a.updateCatalogLocked()
 	total := len(a.tools)
 	registered := len(up.toolNames)
+	name := up.cfg.Name
 	a.mu.Unlock()
 	if total > maxCallToolTools {
 		log.Printf("mcpgateway: 聚合工具数 %d 超过 %d，Codex 客户端 tools/list 将整体失败", total, maxCallToolTools)
 	}
-	log.Printf("mcpgateway: 上游 %q 已连接，注册 %d 个工具", up.cfg.Name, registered)
+	log.Printf("mcpgateway: 上游 %q 已连接，注册 %d 个工具", name, registered)
 }
 
 // registerToolsLocked 把上游工具注册进单例 server 与注册表。调用方必须持有 a.mu。
@@ -447,7 +443,6 @@ func (a *Aggregator) finishConnect(id int64, gen int64, session UpstreamSession,
 // serverID 占用）→ 跳过并 log，先注册者保留——避免后者静默替换前者 handler、
 // 以及任一上游被禁用时误删共享公共名对应的工具。
 func (a *Aggregator) registerToolsLocked(up *upstream, tools []*mcp.Tool) {
-	a.bumpToolsRevLocked(up)
 	seen := make(map[string]bool, len(tools))
 	for _, tool := range tools {
 		public := domain.PublicToolName(up.cfg.Name, tool.Name)
@@ -550,20 +545,20 @@ func (a *Aggregator) refreshTools(id int64, session UpstreamSession, gen int64) 
 }
 
 // detachLocked 摘除上游全部工具并异步关闭会话，但保留记录；
-// 同时递增代际使进行中的连接结果作废。调用方必须持有 a.mu。
+// 同时递增代际使进行中的连接结果作废。调用方必须持有 a.mu，
+// 并在本批摘除结束后调用 flushCatalogLocked。
 func (a *Aggregator) detachLocked(up *upstream) {
 	a.genSeq++
 	up.generation = a.genSeq
 	if len(up.toolNames) > 0 {
-		a.bumpToolsRevLocked(up)
 		a.mcpServer.RemoveTools(up.toolNames...)
 		for _, name := range up.toolNames {
 			delete(a.tools, name)
 		}
 		up.toolNames = nil
 		up.toolDetails = nil
+		a.catalogDirty = true
 	}
-	a.updateCatalogLocked()
 	session := up.session
 	up.session = nil
 	if session != nil {
@@ -573,12 +568,6 @@ func (a *Aggregator) detachLocked(up *upstream) {
 			_ = session.Close() // stdio：SDK 已实现 stdin 关闭→5s→SIGTERM→SIGKILL
 		}()
 	}
-}
-
-// bumpToolsRevLocked 标记上游工具集已变化。调用方必须持有 a.mu。
-func (a *Aggregator) bumpToolsRevLocked(up *upstream) {
-	a.toolsSeq++
-	up.toolsRev = a.toolsSeq
 }
 
 // teardownLocked 摘除连接并删除记录。调用方必须持有 a.mu。
@@ -643,6 +632,7 @@ func (a *Aggregator) markFailed(serverID int64, session UpstreamSession, callErr
 	}
 	cfg := up.cfg
 	a.detachLocked(up)
+	a.flushCatalogLocked()
 	up.session = nil
 	up.state = StateFailed
 	up.err = callErr.Error()
@@ -661,9 +651,17 @@ func (a *Aggregator) ToolCatalog() []ToolInfo {
 	return append([]ToolInfo{}, a.catalog...)
 }
 
-// updateCatalogLocked does sorting/comparison only on registry changes. All
-// fields in ToolInfo are values, so callers can safely receive shallow copies.
+// flushCatalogLocked 在一批摘除结束后重建一次目录；没有工具被摘除时不做任何事。
+func (a *Aggregator) flushCatalogLocked() {
+	if a.catalogDirty {
+		a.updateCatalogLocked()
+	}
+}
+
+// updateCatalogLocked 只在注册表变化时排序和比较。ToolInfo 的字段都是值类型，
+// 调用方拿到浅拷贝也不会影响内部状态。
 func (a *Aggregator) updateCatalogLocked() {
+	a.catalogDirty = false
 	out := make([]ToolInfo, 0, len(a.tools))
 	for _, up := range a.ups {
 		out = append(out, up.toolDetails...)
@@ -704,11 +702,10 @@ func (a *Aggregator) statusesLocked() []UpstreamStatus {
 	statuses := make([]UpstreamStatus, 0, len(a.ups))
 	for id, up := range a.ups {
 		statuses = append(statuses, UpstreamStatus{
-			ServerID:      id,
-			State:         up.state,
-			ToolCount:     len(up.toolNames),
-			ToolsRevision: up.toolsRev,
-			Error:         up.err,
+			ServerID:  id,
+			State:     up.state,
+			ToolCount: len(up.toolNames),
+			Error:     up.err,
 		})
 	}
 	return statuses
@@ -750,6 +747,7 @@ func (a *Aggregator) Close(ctx context.Context) error {
 	for id := range a.ups {
 		a.teardownLocked(id)
 	}
+	a.flushCatalogLocked()
 	a.mu.Unlock()
 
 	done := make(chan struct{})

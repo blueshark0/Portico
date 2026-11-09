@@ -11,7 +11,7 @@ import (
 
 func TestReadOnlyPoolUsesWALSnapshotsWithoutBlockingWriter(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "spaces # ? session.db")
-	// Use a URI for the fixture's literal '?' filename as well as for the reader.
+	// 夹具文件名含字面量 '?'，写入端和只读端都要用 URI 打开。
 	uri := url.URL{Scheme: "file", Path: path}
 	writer, err := sql.Open("sqlite", uri.String()+"?_pragma=journal_mode(WAL)")
 	if err != nil {

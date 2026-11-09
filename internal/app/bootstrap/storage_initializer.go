@@ -100,5 +100,8 @@ func (i *Initializer) runStartupMaintenanceAsync() {
 		if err := observabilityinfra.CleanupOldRequestLogs(observabilityinfra.RequestLogRetentionDays); err != nil {
 			log.Printf("启动维护警告: %v\n", err)
 		}
+		if err := observabilityinfra.RunRequestLogCostMaintenance(); err != nil {
+			log.Printf("费用回填警告: %v\n", err)
+		}
 	}()
 }

@@ -194,6 +194,25 @@ func (r *SQLiteRepository) GetPlatformSessions(platform string) ([]sessiondomain
 	return scanActiveSessions(db, query, platform)
 }
 
+// GetRecentPlatformSessions 取平台最近成功的 limit 条可见会话。过期条件下推到 SQL，
+// 走 idx_session_cleanup，尚未被清理的过期行不必读出来再过滤。
+func (r *SQLiteRepository) GetRecentPlatformSessions(platform string, limit int) ([]sessiondomain.SessionBinding, error) {
+	if platform == "" || limit <= 0 {
+		return []sessiondomain.SessionBinding{}, nil
+	}
+	db, err := storage.DB(r.dbName)
+	if err != nil {
+		return nil, fmt.Errorf("获取数据库连接失败: %w", err)
+	}
+	query := `SELECT platform, session_id, provider_name, last_success_at, created_at
+		FROM session_provider_binding
+		WHERE platform = ? AND hidden = 0 AND last_success_at >= ?
+		ORDER BY last_success_at DESC, session_id ASC
+		LIMIT ?`
+	cutoff := time.Now().Add(-kernel.Platform(platform).SessionTimeout())
+	return scanActiveSessions(db, query, platform, cutoff, limit)
+}
+
 func (r *SQLiteRepository) UnbindSession(platform, sessionID string) error {
 	db, err := storage.DB(r.dbName)
 	if err != nil {

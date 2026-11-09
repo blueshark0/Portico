@@ -7,6 +7,13 @@ import (
 	"portico/internal/shared/storage"
 )
 
+// newSQLiteQueriesOn 让查询走指定连接，隔离并行存在的测试库。
+func newSQLiteQueriesOn(dbName string) *SQLiteQueries {
+	q := NewSQLiteQueries()
+	q.dbName = dbName
+	return q
+}
+
 func openRequestLogTestDB(t *testing.T, dsn string, maxOpen, maxIdle int) *sql.DB {
 	t.Helper()
 	if err := storage.OpenConnection(storage.ConnectionConfig{

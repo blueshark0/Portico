@@ -2,6 +2,7 @@ package application
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -38,7 +39,7 @@ func TestRuntimeSnapshotTracksContentAndOmitsUnchangedCatalog(t *testing.T) {
 			t.Fatalf("unchanged catalog must not be transmitted: %s, %v", data, err)
 		}
 	}
-	// A repeated notification with identical content does not invalidate clients.
+	// 内容完全相同的重复通知不应让客户端的目录失效。
 	a.refreshTools(1, session, up.generation)
 	if a.RuntimeSnapshot(added.CatalogRevision).CatalogChanged {
 		t.Fatal("unchanged tool refresh advanced revision")
@@ -60,6 +61,7 @@ func TestRuntimeSnapshotTracksContentAndOmitsUnchangedCatalog(t *testing.T) {
 	}
 	a.mu.Lock()
 	a.detachLocked(up)
+	a.flushCatalogLocked()
 	up.state = StateDisabled
 	a.mu.Unlock()
 	removed := a.RuntimeSnapshot(changed.CatalogRevision)
@@ -68,9 +70,46 @@ func TestRuntimeSnapshotTracksContentAndOmitsUnchangedCatalog(t *testing.T) {
 	}
 	a.mu.Lock()
 	a.teardownLocked(1)
+	a.flushCatalogLocked()
 	a.mu.Unlock()
 	deleted := a.RuntimeSnapshot(removed.CatalogRevision)
 	if deleted.CatalogChanged || len(deleted.Statuses) != 0 {
 		t.Fatalf("deleting an empty upstream changes only statuses: %+v", deleted)
+	}
+}
+
+// 一次同步里批量停用多个上游时，目录只重建一次，客户端也只需重拉一次工具清单。
+func TestSyncRebuildsCatalogOnceWhenDetachingMultipleUpstreams(t *testing.T) {
+	repo := &fakeRepo{servers: []domain.McpServer{
+		{ID: 1, Name: "a", Type: domain.ServerTypeStdio, Command: "x", Enabled: true},
+		{ID: 2, Name: "b", Type: domain.ServerTypeStdio, Command: "x", Enabled: true},
+	}}
+	agg := newTestAggregator(t, repo, func(context.Context, domain.McpServer) (UpstreamSession, error) {
+		return &fakeSession{tools: []*mcp.Tool{{Name: "t", InputSchema: objectSchema()}}}, nil
+	})
+	_ = agg.Sync(context.Background())
+	waitForState(t, agg, 1, StateConnected)
+	waitForState(t, agg, 2, StateConnected)
+	before := agg.RuntimeSnapshot(0).CatalogRevision
+
+	_ = repo.SetEnabled(context.Background(), 1, false)
+	_ = repo.SetEnabled(context.Background(), 2, false)
+	_ = agg.Sync(context.Background())
+	if after := agg.RuntimeSnapshot(0); after.CatalogRevision != before+1 || len(after.Tools) != 0 {
+		t.Fatalf("expected one catalog change, revision %d -> %d, tools=%d", before, after.CatalogRevision, len(after.Tools))
+	}
+}
+
+// finishConnect 释放锁后不能再读 up.cfg：同一时刻 syncOnce 可能正在持锁改写它。
+func TestFinishConnectDoesNotReadConfigOutsideLock(t *testing.T) {
+	for range 50 {
+		repo := &fakeRepo{servers: []domain.McpServer{{ID: 1, Name: "a", Type: domain.ServerTypeStdio, Command: "x", Enabled: true}}}
+		agg := newTestAggregator(t, repo, func(context.Context, domain.McpServer) (UpstreamSession, error) {
+			return &fakeSession{}, nil
+		})
+		_ = agg.Sync(context.Background())
+		waitForState(t, agg, 1, StateConnected)
+		_ = repo.SetEnabled(context.Background(), 1, false)
+		_ = agg.Sync(context.Background())
 	}
 }

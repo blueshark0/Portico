@@ -43,24 +43,18 @@ const menuFor = ref(0)
 const testingId = ref(0)
 
 let pollTimer: number | undefined
-let runtimeRefreshing = false
 let disposed = false
 
 // RuntimeSnapshot 始终刷新状态，仅在 catalogRevision 变化时携带完整工具清单。
-const refreshRuntime = async () => {
-  if (disposed || runtimeRefreshing || document.hidden) return
-  runtimeRefreshing = true
-  try {
-    await refreshStatuses()
-  } finally {
-    runtimeRefreshing = false
-  }
+const refreshRuntime = () => {
+  if (disposed || document.hidden) return
+  void refreshStatuses({ skipIfLoading: true })
 }
 
 onMounted(async () => {
   await loadAll()
   if (disposed) return
-  pollTimer = window.setInterval(() => void refreshRuntime(), 1000)
+  pollTimer = window.setInterval(refreshRuntime, 1000)
   window.addEventListener('click', closeMenu)
 })
 
@@ -145,19 +139,6 @@ const openDiagnostics = (server?: McpServerRecord) => {
   }
 }
 
-const onSaved = async () => {
-  await refreshStatuses()
-}
-
-const onSubmitEditor = async () => {
-  const saved = await submitEditor()
-  if (saved) await onSaved()
-}
-
-const onSubmitAndTest = async () => {
-  await submitEditorAndTest()
-  await onSaved()
-}
 </script>
 
 <template>
@@ -309,8 +290,8 @@ const onSubmitAndTest = async () => {
     <McpEditorModal
       :state="editorState"
       @close="closeEditor"
-      @submit="onSubmitEditor"
-      @submit-and-test="onSubmitAndTest"
+      @submit="submitEditor"
+      @submit-and-test="submitEditorAndTest"
     />
 
     <BaseModal
@@ -330,7 +311,7 @@ const onSubmitAndTest = async () => {
           type="button"
           class="cs-btn cs-btn--danger"
           :disabled="confirmState.busy"
-          @click="confirmDelete().then(onSaved)"
+          @click="confirmDelete"
         >
           {{ t('mcpPage.delete.confirm') }}
         </button>

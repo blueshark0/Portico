@@ -38,6 +38,10 @@ func (s *sessionRepoStub) GetPlatformSessions(platform string) ([]sessiondomain.
 	return nil, nil
 }
 
+func (s *sessionRepoStub) GetRecentPlatformSessions(platform string, limit int) ([]sessiondomain.SessionBinding, error) {
+	return nil, nil
+}
+
 func (s *sessionRepoStub) UnbindSession(platform, sessionID string) error {
 	s.unbindCalls++
 	s.lastPlat = platform

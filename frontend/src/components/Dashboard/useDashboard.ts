@@ -96,49 +96,58 @@ export const useDashboard = () => {
     return 'idle'
   })
 
+  const loadMcpOverview = async () => {
+    const [statusList, serverList, endpoint, claudeInjected, codexInjected] = await Promise.all([
+      fetchMcpStatuses(),
+      fetchMcpServers(),
+      fetchMcpEndpoint(),
+      fetchInjectionStatus('claude'),
+      fetchInjectionStatus('codex'),
+    ])
+    mcpStatuses.value = statusList ?? []
+    mcpServers.value = serverList ?? []
+    mcpEndpoint.value = endpoint
+    mcpInjected.value = { claude: claudeInjected, codex: codexInjected }
+  }
+
+  const loadRecentSessions = async () => {
+    const bindings = await fetchRecentSessions(5)
+    recentSessions.value = (bindings ?? []).map((binding) => ({
+      platform: binding.platform as ProviderTab,
+      platformLabel: providerTabs.find((tab) => tab.id === binding.platform)?.label ?? binding.platform,
+      providerName: binding.provider_name,
+      sessionId: binding.session_id,
+      lastSuccessAt: binding.last_success_at,
+    }))
+  }
+
+  // 用返回值而非 push，保证 clients 顺序恒为 providerTabs 声明顺序。
+  const loadClients = async () => {
+    clients.value = await Promise.all(
+      providerTabs.map(async (tab) => {
+        const [profile, proxyStatus] = await Promise.all([
+          fetchRouteProfile(tab.id),
+          fetchProxyStatus(tab.id),
+        ])
+        const clientRow: DashboardClient = {
+          platform: tab.id,
+          label: tab.label,
+          proxyEnabled: Boolean(proxyStatus?.enabled),
+          ...providerFields(profile),
+        }
+        return clientRow
+      }),
+    )
+  }
+
+  // 三块数据互相独立：并行请求缩短首屏，一块失败也不影响其余两块显示。
   const load = async () => {
     loading.value = true
-    try {
-      const [statusList, serverList, endpoint, claudeInjected, codexInjected, bindings] = await Promise.all([
-        fetchMcpStatuses(),
-        fetchMcpServers(),
-        fetchMcpEndpoint(),
-        fetchInjectionStatus('claude'),
-        fetchInjectionStatus('codex'),
-        fetchRecentSessions(5),
-      ])
-      mcpStatuses.value = statusList ?? []
-      mcpServers.value = serverList ?? []
-      mcpEndpoint.value = endpoint
-      mcpInjected.value = { claude: claudeInjected, codex: codexInjected }
-      recentSessions.value = (bindings ?? []).map((binding) => ({
-        platform: binding.platform as ProviderTab,
-        platformLabel: providerTabs.find((tab) => tab.id === binding.platform)?.label ?? binding.platform,
-        providerName: binding.provider_name,
-        sessionId: binding.session_id,
-        lastSuccessAt: binding.last_success_at,
-      }))
-
-      // 并行拉取各平台数据；用返回值而非 push，保证 clients 顺序恒为 providerTabs 声明顺序。
-      const results = await Promise.all(
-        providerTabs.map(async (tab) => {
-          const [profile, proxyStatus] = await Promise.all([
-            fetchRouteProfile(tab.id),
-            fetchProxyStatus(tab.id),
-          ])
-          const clientRow: DashboardClient = {
-            platform: tab.id,
-            label: tab.label,
-            proxyEnabled: Boolean(proxyStatus?.enabled),
-            ...providerFields(profile),
-          }
-          return clientRow
-        }),
-      )
-      clients.value = results
-    } finally {
-      loading.value = false
+    const results = await Promise.allSettled([loadMcpOverview(), loadRecentSessions(), loadClients()])
+    for (const result of results) {
+      if (result.status === 'rejected') console.error('failed to load dashboard section', result.reason)
     }
+    loading.value = false
   }
 
   // 快捷切换面板改完默认供应商后，就地刷新卡片的当前供应商/模型（不触发整页 loading）。
