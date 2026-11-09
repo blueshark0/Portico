@@ -1,4 +1,4 @@
-import { computed, onUnmounted, reactive, ref } from 'vue'
+import { computed, onUnmounted, reactive, ref, shallowRef } from 'vue'
 import {
   McpServer,
   ServerType,
@@ -105,10 +105,12 @@ export const validateServerName = (name: string): boolean =>
 export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
   const servers = ref<McpServerRecord[]>([])
   const statuses = ref<Record<number, UpstreamStatus>>({})
-  const tools = ref<ToolInfo[]>([])
+  // 工具清单只会整体替换，且每项带完整 InputSchema，不需要深层响应式。
+  const tools = shallowRef<ToolInfo[]>([])
   let catalogRevision = 0
   let disposed = false
   let runtimeLoadPromise: Promise<void> | null = null
+  let queuedRuntimeReload = false
   onUnmounted(() => { disposed = true })
   const endpoint = ref('')
   const loading = ref(false)
@@ -131,25 +133,41 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
     Object.values(statuses.value).reduce((sum, s) => sum + (s.toolCount || 0), 0),
   )
 
+  // 状态未变化时保留原对象：1Hz 轮询不应让依赖 statuses 的计算属性每秒重算。
   const applyStatuses = (list: UpstreamStatus[]) => {
+    const current = statuses.value
+    const unchanged =
+      list.length === Object.keys(current).length &&
+      list.every((st) => {
+        const known = current[st.serverId]
+        return known && known.state === st.state && known.toolCount === st.toolCount && known.error === st.error
+      })
+    if (unchanged) return
     const next: Record<number, UpstreamStatus> = {}
     for (const st of list) next[st.serverId] = st
     statuses.value = next
   }
 
-  const refreshStatuses = (): Promise<void> => {
+  // 进行中的请求可能早于刚完成的变更，默认补发一次；只有定时轮询才可以直接跳过。
+  const refreshStatuses = (options: { skipIfLoading?: boolean } = {}): Promise<void> => {
     if (disposed) return Promise.resolve()
-    if (runtimeLoadPromise) return runtimeLoadPromise
+    if (runtimeLoadPromise) {
+      if (!options.skipIfLoading) queuedRuntimeReload = true
+      return runtimeLoadPromise
+    }
     runtimeLoadPromise = (async () => {
       try {
-        const snapshot = await runWithToast(() => fetchMcpRuntimeSnapshot(catalogRevision), {
-          fallback: t('components.mcp.messages.statusLoadFailed'),
-          silent: true,
-        })
-        if (!snapshot || disposed) return
-        applyStatuses(snapshot.statuses ?? [])
-        if (snapshot.catalogChanged) tools.value = snapshot.tools ?? []
-        catalogRevision = snapshot.catalogRevision
+        do {
+          queuedRuntimeReload = false
+          const snapshot = await runWithToast(() => fetchMcpRuntimeSnapshot(catalogRevision), {
+            fallback: t('components.mcp.messages.statusLoadFailed'),
+            silent: true,
+          })
+          if (!snapshot || disposed) continue
+          applyStatuses(snapshot.statuses ?? [])
+          if (snapshot.catalogChanged) tools.value = snapshot.tools ?? []
+          catalogRevision = snapshot.catalogRevision
+        } while (queuedRuntimeReload && !disposed)
       } finally {
         runtimeLoadPromise = null
       }

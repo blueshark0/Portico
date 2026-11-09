@@ -146,19 +146,28 @@ func (q *SQLiteQueries) queryRequestLogs(db requestLogQuerier, query string, arg
 	return logs, nil
 }
 
+// requestLogProvidersSQL 用递归 CTE 做松散索引扫描：每一步沿索引跳到下一个供应商，
+// 耗时只与供应商数量有关；SELECT DISTINCT 则要遍历 30 天内的全部索引项。
+func requestLogProvidersSQL(platform string) (string, []any) {
+	filter := ""
+	var args []any
+	if platform != "" {
+		filter = " AND platform = ?"
+		args = []any{platform, platform}
+	}
+	return "WITH RECURSIVE providers(provider) AS (" +
+		"SELECT MIN(provider) FROM request_log WHERE provider > ''" + filter +
+		" UNION ALL SELECT (SELECT MIN(provider) FROM request_log WHERE provider > providers.provider" + filter + ")" +
+		" FROM providers WHERE providers.provider IS NOT NULL)" +
+		" SELECT provider FROM providers WHERE provider IS NOT NULL ORDER BY provider ASC", args
+}
+
 func (q *SQLiteQueries) ListProviders(platform string) ([]string, error) {
 	db, err := q.readDB()
 	if err != nil {
 		return nil, err
 	}
-	query := "SELECT DISTINCT provider FROM request_log WHERE provider != ''"
-	args := make([]any, 0, 1)
-	if platform != "" {
-		query += " AND platform = ?"
-		args = append(args, platform)
-	}
-	query += " ORDER BY provider ASC"
-
+	query, args := requestLogProvidersSQL(platform)
 	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err

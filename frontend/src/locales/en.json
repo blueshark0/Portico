@@ -946,7 +946,6 @@
       "confirm": "Delete"
     },
     "messages": {
-      "toolsLoadFailed": "Failed to load tool inventory",
       "testOk": "Connected, {count} tools discovered ({ms}ms)",
       "testErr": "Connection failed: {error}",
       "testFailed": "Connection test failed"

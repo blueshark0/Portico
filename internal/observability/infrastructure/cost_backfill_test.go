@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCostBackfillBatchesResumeAndPreserveExistingCosts(t *testing.T) {
@@ -15,6 +16,9 @@ func TestCostBackfillBatchesResumeAndPreserveExistingCosts(t *testing.T) {
 	defer db.Close()
 	db.SetMaxOpenConns(1)
 	if err := EnsureRequestLogTableWithDB(db); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureRequestLogUnpricedIndex(db); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<1205)
@@ -74,5 +78,49 @@ func TestCostBackfillBatchesResumeAndPreserveExistingCosts(t *testing.T) {
 	}
 	if !indexed {
 		t.Fatal("startup backfill does not use the pending-only index")
+	}
+}
+
+// 建表在窗口出现前同步执行，不能承担与历史数据量成正比的回填。
+func TestEnsureRequestLogTableLeavesCostBackfillToMaintenance(t *testing.T) {
+	db := setupRangeQueryTestDB(t)
+	if _, err := db.Exec("INSERT INTO request_log(model, input_tokens, output_tokens) VALUES ('gpt-4.1', 100, 10)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureRequestLogTableWithDB(db); err != nil {
+		t.Fatal(err)
+	}
+	var pending int
+	if err := db.QueryRow("SELECT COUNT(*) FROM request_log WHERE total_cost IS NULL").Scan(&pending); err != nil || pending != 1 {
+		t.Fatalf("EnsureRequestLogTableWithDB must not backfill: pending=%d err=%v", pending, err)
+	}
+	if err := RunRequestLogCostMaintenance(); err != nil {
+		t.Fatalf("RunRequestLogCostMaintenance: %v", err)
+	}
+	if err := db.QueryRow("SELECT COUNT(*) FROM request_log WHERE total_cost IS NULL").Scan(&pending); err != nil || pending != 0 {
+		t.Fatalf("maintenance left pending rows: pending=%d err=%v", pending, err)
+	}
+}
+
+// 后台回填与请求日志写入并发：写批次必须和其他写入共用 requestLogWriteMu。
+func TestCostBackfillBatchHoldsRequestLogWriteLock(t *testing.T) {
+	db := setupRangeQueryTestDB(t)
+	if _, err := db.Exec("INSERT INTO request_log(model, input_tokens, output_tokens) VALUES ('gpt-4.1', 100, 10)"); err != nil {
+		t.Fatal(err)
+	}
+	requestLogWriteMu.Lock()
+	done := make(chan error, 1)
+	go func() {
+		done <- writeRequestLogCostBatch(db, []requestLogCostUpdate{{id: 1, totalCost: 1, hasPricing: true}})
+	}()
+	select {
+	case err := <-done:
+		requestLogWriteMu.Unlock()
+		t.Fatalf("write batch ran without the write lock: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	requestLogWriteMu.Unlock()
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

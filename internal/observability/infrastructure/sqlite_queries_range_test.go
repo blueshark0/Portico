@@ -22,7 +22,7 @@ func TestListRequestLogs_FiltersByNaturalDayRange(t *testing.T) {
 	seedRequestLog(t, db, time.Date(2026, time.March, 10, 10, 0, 0, 0, loc), "codex", "alpha", "gpt-4.1")
 	seedRequestLog(t, db, time.Date(2026, time.March, 9, 10, 0, 0, 0, loc), "claude", "alpha", "gpt-4.1")
 
-	queries := NewSQLiteQueries(storage.RequestLogDBName)
+	queries := newSQLiteQueriesOn(storage.RequestLogDBName)
 
 	todayLogs, err := queries.ListRequestLogs("", "", "today", "all", "all", 1, 100)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestListRequestLogs_PaginatesWithTotal(t *testing.T) {
 		seedRequestLog(t, db, time.Date(2026, time.March, 16, 9, i, 0, 0, loc), "claude", "alpha", "gpt-4.1")
 	}
 
-	queries := NewSQLiteQueries(storage.RequestLogDBName)
+	queries := newSQLiteQueriesOn(storage.RequestLogDBName)
 	page, err := queries.ListRequestLogs("", "", "today", "all", "all", 2, 2)
 	if err != nil {
 		t.Fatalf("ListRequestLogs page 2: %v", err)
@@ -289,7 +289,7 @@ func TestStatsSince_UsesAdaptiveBucketsForRange(t *testing.T) {
 	seedRequestLogWithUsage(t, db, time.Date(2026, time.March, 14, 8, 0, 0, 0, loc), "claude", "beta", "gpt-4.1", 4, 6, 0)
 	seedRequestLogWithUsage(t, db, time.Date(2026, time.March, 13, 20, 0, 0, 0, loc), "claude", "alpha", "gpt-4.1", 8, 1, 0)
 
-	queries := NewSQLiteQueries(storage.RequestLogDBName)
+	queries := newSQLiteQueriesOn(storage.RequestLogDBName)
 
 	todayStats, err := queries.StatsSince("claude", "alpha", "today", "all", "all")
 	if err != nil {
@@ -343,7 +343,7 @@ func newRangeTestQueriesWithPricing(t *testing.T) *SQLiteQueries {
 	if err != nil {
 		t.Fatalf("modelpricing.NewService: %v", err)
 	}
-	queries := NewSQLiteQueries(storage.RequestLogDBName)
+	queries := newSQLiteQueriesOn(storage.RequestLogDBName)
 	queries.pricing = pricing
 	return queries
 }

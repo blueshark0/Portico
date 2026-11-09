@@ -184,6 +184,8 @@ const handlers: Record<number, (...args: any[]) => any> = {
     const size = pageSize || 200
     return { items: clone(filtered.slice((p - 1) * size, p * size)), total: filtered.length, page: p, page_size: size }
   },
+  3036209520: (platform: string, provider: string, rangeKey: string, costTier: string, httpStatus: string) =>
+    clone(filterLogs(mockRequestLogs, platform, provider, rangeKey || 'last7days', costTier, httpStatus).slice(0, 5000)),
   2012320427: (platform: string, provider: string, rangeKey: string, costTier: string, httpStatus: string) => ({
     ...statsOf(filterLogs(mockRequestLogs, platform, provider, rangeKey || 'last7days', costTier, httpStatus)),
     series: seriesOf(filterLogs(mockRequestLogs, platform, provider, rangeKey || 'last7days', costTier, httpStatus)),
@@ -311,8 +313,6 @@ const handlers: Record<number, (...args: any[]) => any> = {
       toolCount: server.enabled
         ? mockMcpTools.filter((tool) => tool.serverId === server.id).length
         : 0,
-      // 演示数据的工具集固定：启用即版本 1，禁用为 0（页面据此决定是否重拉工具）。
-      toolsRevision: server.enabled ? 1 : 0,
     })),
   3609087734: () => 'http://127.0.0.1:18100/mcp',
   308868850: () => clone(mockMcpTools),

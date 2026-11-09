@@ -2,8 +2,11 @@ package infrastructure
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
+	"portico/internal/shared/kernel"
 	"portico/internal/shared/storage"
 )
 
@@ -121,4 +124,61 @@ func newSessionRepositoryForTest(t *testing.T) (*SQLiteRepository, func()) {
 		t.Fatal(err)
 	}
 	return repo, func() { _ = storage.CloseConnection(dbName) }
+}
+
+func TestGetRecentPlatformSessionsAppliesVisibilityExpiryAndLimit(t *testing.T) {
+	const name = "recent_sessions_test"
+	if err := storage.OpenConnection(storage.ConnectionConfig{Name: name, Driver: "sqlite", DSN: storage.SQLiteDSN(filepath.Join(t.TempDir(), "session.db")), MaxOpenConn: 1, MaxIdleConn: 1}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = storage.CloseConnection(name) })
+	repo := NewSQLiteRepository(name)
+	if err := repo.EnsureSchema(); err != nil {
+		t.Fatal(err)
+	}
+	db, err := storage.DB(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	timeout := kernel.PlatformClaude.SessionTimeout()
+	for _, row := range []struct {
+		platform, id string
+		last         time.Time
+		hidden       int
+	}{
+		{"claude", "old", now.Add(-time.Minute * 3), 0},
+		{"claude", "mid", now.Add(-time.Minute * 2), 0},
+		{"claude", "new", now.Add(-time.Minute), 0},
+		{"claude", "hidden", now, 1},
+		{"claude", "expired", now.Add(-timeout - time.Minute), 0},
+		{"codex", "other", now, 0},
+	} {
+		if _, err := db.Exec(`INSERT INTO session_provider_binding (platform, session_id, provider_name, last_success_at, created_at, hidden) VALUES (?, ?, 'p', ?, ?, ?)`,
+			row.platform, row.id, row.last, row.last, row.hidden); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := repo.GetRecentPlatformSessions("claude", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0].SessionID != "new" || got[1].SessionID != "mid" {
+		t.Fatalf("unexpected recent sessions: %+v", got)
+	}
+	all, err := repo.GetRecentPlatformSessions("claude", 10)
+	if err != nil || len(all) != 3 {
+		t.Fatalf("expected visible unexpired sessions only: %+v, %v", all, err)
+	}
+
+	var id, parent, unused int
+	var detail string
+	if err := db.QueryRow(`EXPLAIN QUERY PLAN SELECT platform FROM session_provider_binding
+		WHERE platform = ? AND hidden = 0 AND last_success_at >= ?
+		ORDER BY last_success_at DESC, session_id ASC LIMIT ?`, "claude", now, 5).Scan(&id, &parent, &unused, &detail); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(detail, "idx_session_cleanup") {
+		t.Fatalf("expected the recent query to use idx_session_cleanup: %s", detail)
+	}
 }

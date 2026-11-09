@@ -2,6 +2,8 @@ package application
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,8 +15,15 @@ type recentRepo struct {
 	items map[string][]sessiondomain.SessionBinding
 }
 
-func (r *recentRepo) GetPlatformSessions(platform string) ([]sessiondomain.SessionBinding, error) {
-	return r.items[platform], nil
+func (r *recentRepo) GetRecentPlatformSessions(platform string, limit int) ([]sessiondomain.SessionBinding, error) {
+	items := slices.Clone(r.items[platform])
+	slices.SortFunc(items, func(a, b sessiondomain.SessionBinding) int {
+		if c := b.LastSuccessAt.Compare(a.LastSuccessAt); c != 0 {
+			return c
+		}
+		return strings.Compare(a.SessionID, b.SessionID)
+	})
+	return items[:min(limit, len(items))], nil
 }
 
 func TestListRecentSortsAcrossPlatformsAndBoundsResults(t *testing.T) {

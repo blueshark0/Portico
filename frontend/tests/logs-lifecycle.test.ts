@@ -3,12 +3,12 @@ import { defineComponent, h } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { useLogsDashboard } from '../src/components/Logs/useLogsDashboard'
 
-const api = vi.hoisted(() => ({ list: vi.fn(), stats: vi.fn(), providers: vi.fn() }))
+const api = vi.hoisted(() => ({ list: vi.fn(), exportLogs: vi.fn(), stats: vi.fn(), providers: vi.fn() }))
 vi.mock('../src/services/logs', () => ({
   DEFAULT_LOG_RANGE: 'last7days', DEFAULT_LOG_HTTP_STATUS: 'all', DEFAULT_LOG_PAGE_SIZE: 200,
   LOG_RANGE_OPTIONS: ['today', 'last7days'], LOG_PAGE_SIZE_OPTIONS: [200],
   normalizeLogPageSize: (n: number) => n, normalizeLogRangeKey: (s: string) => s,
-  fetchRequestLogs: api.list, fetchLogStats: api.stats, fetchLogProviders: api.providers,
+  fetchRequestLogs: api.list, fetchRequestLogsForExport: api.exportLogs, fetchLogStats: api.stats, fetchLogProviders: api.providers,
 }))
 
 function deferred<T>() {
@@ -30,6 +30,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
   vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
   api.list.mockReset().mockResolvedValue(emptyPage)
+  api.exportLogs.mockReset().mockResolvedValue([])
   api.stats.mockReset().mockResolvedValue(null)
   api.providers.mockReset().mockResolvedValue([])
 })
@@ -74,5 +75,28 @@ describe('request-log page lifecycle', () => {
     await flushPromises()
     wrapper.unmount()
     expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+describe('request-log CSV export', () => {
+  it('fetches once without paging and still downloads after leaving the page', async () => {
+    const createUrl = vi.fn(() => 'blob:export')
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: vi.fn() }))
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const { wrapper, state } = harness()
+    await flushPromises()
+    api.list.mockClear()
+    const pending = deferred<unknown[]>()
+    api.exportLogs.mockReturnValueOnce(pending.promise)
+    const exporting = state.exportCsv()
+    wrapper.unmount()
+    pending.resolve([{ id: 1, created_at: '2026-11-06 10:00:00', platform: 'claude' }])
+    await exporting
+    expect(api.exportLogs).toHaveBeenCalledTimes(1)
+    expect(api.list).not.toHaveBeenCalled()
+    expect(createUrl).toHaveBeenCalledTimes(1)
+    expect(click).toHaveBeenCalledTimes(1)
+    expect(state.exporting.value).toBe(false)
+    vi.unstubAllGlobals()
   })
 })

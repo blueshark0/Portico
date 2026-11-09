@@ -34,7 +34,7 @@ func TestSessionUsageForSessions_AggregatesPerSession(t *testing.T) {
 		t.Fatalf("Process: %v", err)
 	}
 
-	selected, err := NewSQLiteQueries(storage.RequestLogDBName).SessionUsageForSessions("claude", []string{"s-1", "s-1", "", "c-1", "missing"})
+	selected, err := newSQLiteQueriesOn(storage.RequestLogDBName).SessionUsageForSessions("claude", []string{"s-1", "s-1", "", "c-1", "missing"})
 	if err != nil || len(selected) != 1 || selected["s-1"].Requests != 2 {
 		t.Fatalf("must include only requested platform/session pairs without double counting: %+v, %v", selected, err)
 	}
@@ -45,11 +45,11 @@ func TestSessionUsageForSessions_AggregatesPerSession(t *testing.T) {
 		ids = append(ids, fmt.Sprintf("missing-%d", i))
 	}
 	ids = append(ids, "s-1", "s-2", "s-1")
-	batched, err := NewSQLiteQueries(storage.RequestLogDBName).SessionUsageForSessions("claude", ids)
+	batched, err := newSQLiteQueriesOn(storage.RequestLogDBName).SessionUsageForSessions("claude", ids)
 	if err != nil || len(batched) != 2 || batched["s-1"].Requests != 2 || batched["s-2"].Requests != 1 {
 		t.Fatalf("batched session usage: %+v, %v", batched, err)
 	}
-	usage, err := NewSQLiteQueries(storage.RequestLogDBName).SessionUsageForSessions("claude", []string{"s-1", "s-2"})
+	usage, err := newSQLiteQueriesOn(storage.RequestLogDBName).SessionUsageForSessions("claude", []string{"s-1", "s-2"})
 	if err != nil {
 		t.Fatalf("SessionUsageForSessions: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestSessionUsageForSessions_AggregatesPerSession(t *testing.T) {
 		t.Fatalf("expected s-1 to have 2 distinct models, got %v", s1.Models)
 	}
 
-	logs, err := NewSQLiteQueries(storage.RequestLogDBName).ListSessionRequestLogs("claude", "s-1")
+	logs, err := newSQLiteQueriesOn(storage.RequestLogDBName).ListSessionRequestLogs("claude", "s-1")
 	if err != nil {
 		t.Fatalf("ListSessionRequestLogs: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestSessionUsageForSessions_AggregatesPerSession(t *testing.T) {
 	if logs[0].Model != "claude-opus-4" || logs[1].Model != "claude-sonnet-4" {
 		t.Fatalf("expected newest session request first, got %q then %q", logs[0].Model, logs[1].Model)
 	}
-	otherPlatform, err := NewSQLiteQueries(storage.RequestLogDBName).ListSessionRequestLogs("codex", "s-1")
+	otherPlatform, err := newSQLiteQueriesOn(storage.RequestLogDBName).ListSessionRequestLogs("codex", "s-1")
 	if err != nil || len(otherPlatform) != 0 {
 		t.Fatalf("session query must be platform scoped: logs=%+v err=%v", otherPlatform, err)
 	}
@@ -90,7 +90,7 @@ func TestSessionUsageForSessions_AggregatesPerSession(t *testing.T) {
 		t.Fatalf("expected s-2 requests 1, got %d", usage["s-2"].Requests)
 	}
 
-	codexUsage, err := NewSQLiteQueries(storage.RequestLogDBName).SessionUsageForSessions("codex", []string{"c-1", "s-1"})
+	codexUsage, err := newSQLiteQueriesOn(storage.RequestLogDBName).SessionUsageForSessions("codex", []string{"c-1", "s-1"})
 	if err != nil {
 		t.Fatalf("SessionUsageForSessions codex: %v", err)
 	}

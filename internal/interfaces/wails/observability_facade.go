@@ -9,6 +9,7 @@ import (
 // facade 直接依赖查询接口，不再经过逐字转发的 application 层。
 type ObservabilityQueries interface {
 	ListRequestLogs(platform string, provider string, rangeKey string, costTier string, httpStatus string, page int, pageSize int) (observabilitydomain.RequestLogPage, error)
+	ExportRequestLogs(platform string, provider string, rangeKey string, costTier string, httpStatus string) ([]observabilitydomain.RequestLog, error)
 	ListSessionRequestLogs(platform string, sessionID string) ([]observabilitydomain.RequestLog, error)
 	ListProviders(platform string) ([]string, error)
 	StatsSince(platform string, provider string, rangeKey string, costTier string, httpStatus string) (observabilitydomain.LogStats, error)
@@ -26,6 +27,10 @@ func NewObservabilityFacade(queries ObservabilityQueries) *ObservabilityFacade {
 
 func (f *ObservabilityFacade) ListRequestLogs(platform string, provider string, rangeKey string, costTier string, httpStatus string, page int, pageSize int) (observabilitydomain.RequestLogPage, error) {
 	return f.queries.ListRequestLogs(platform, provider, rangeKey, costTier, httpStatus, page, pageSize)
+}
+
+func (f *ObservabilityFacade) ExportRequestLogs(platform string, provider string, rangeKey string, costTier string, httpStatus string) ([]observabilitydomain.RequestLog, error) {
+	return f.queries.ExportRequestLogs(platform, provider, rangeKey, costTier, httpStatus)
 }
 
 func (f *ObservabilityFacade) ListSessionRequestLogs(platform string, sessionID string) ([]observabilitydomain.RequestLog, error) {

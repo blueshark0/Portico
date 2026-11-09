@@ -18,8 +18,8 @@ func SQLiteDSN(path string) string {
 		"&_pragma=wal_autocheckpoint(1000)", path)
 }
 
-// SQLiteReadOnlyDSN opens the existing WAL database without changing its journal
-// settings. query_only applies to every pooled connection as a second guard.
+// SQLiteReadOnlyDSN 打开已存在的 WAL 数据库，不改动其日志设置。
+// query_only 作用于池内每个连接，作为第二道防线。
 func SQLiteReadOnlyDSN(path string) string {
 	uriPath := filepath.ToSlash(path)
 	if filepath.VolumeName(path) != "" && !strings.HasPrefix(uriPath, "/") {

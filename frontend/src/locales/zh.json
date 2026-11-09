@@ -946,7 +946,6 @@
       "confirm": "删除"
     },
     "messages": {
-      "toolsLoadFailed": "加载工具清单失败",
       "testOk": "连接成功，发现 {count} 个工具（{ms}ms）",
       "testErr": "连接失败：{error}",
       "testFailed": "测试连接失败"

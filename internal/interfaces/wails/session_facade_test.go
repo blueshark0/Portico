@@ -14,6 +14,10 @@ type sessionListRepo struct {
 	bindings []sessiondomain.SessionBinding
 }
 
+func (r *sessionListRepo) GetRecentPlatformSessions(string, int) ([]sessiondomain.SessionBinding, error) {
+	return nil, nil
+}
+
 func (r *sessionListRepo) GetPlatformSessions(string) ([]sessiondomain.SessionBinding, error) {
 	return r.bindings, nil
 }
