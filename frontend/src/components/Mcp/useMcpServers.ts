@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, onUnmounted, reactive, ref } from 'vue'
 import {
   McpServer,
   ServerType,
@@ -6,7 +6,7 @@ import {
   fetchInjectionStatus,
   fetchMcpEndpoint,
   fetchMcpServers,
-  fetchMcpStatuses,
+  fetchMcpRuntimeSnapshot,
   injectMcp,
   removeMcpInjection,
   saveMcpServer,
@@ -15,6 +15,7 @@ import {
   type McpServerRecord,
   type TestResult,
   type UpstreamStatus,
+  type ToolInfo,
 } from '../../services/mcp'
 import { getErrorMessage } from '../../utils/errors'
 import { showToast } from '../../utils/toast'
@@ -104,6 +105,11 @@ export const validateServerName = (name: string): boolean =>
 export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
   const servers = ref<McpServerRecord[]>([])
   const statuses = ref<Record<number, UpstreamStatus>>({})
+  const tools = ref<ToolInfo[]>([])
+  let catalogRevision = 0
+  let disposed = false
+  let runtimeLoadPromise: Promise<void> | null = null
+  onUnmounted(() => { disposed = true })
   const endpoint = ref('')
   const loading = ref(false)
   // claude/codex 各自的注入状态；null = 尚未加载
@@ -131,33 +137,45 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
     statuses.value = next
   }
 
-  const refreshStatuses = async () => {
-    const list = await runWithToast(() => fetchMcpStatuses(), {
-      fallback: t('components.mcp.messages.statusLoadFailed'),
-      silent: true,
-    })
-    if (list) applyStatuses(list)
+  const refreshStatuses = (): Promise<void> => {
+    if (disposed) return Promise.resolve()
+    if (runtimeLoadPromise) return runtimeLoadPromise
+    runtimeLoadPromise = (async () => {
+      try {
+        const snapshot = await runWithToast(() => fetchMcpRuntimeSnapshot(catalogRevision), {
+          fallback: t('components.mcp.messages.statusLoadFailed'),
+          silent: true,
+        })
+        if (!snapshot || disposed) return
+        applyStatuses(snapshot.statuses ?? [])
+        if (snapshot.catalogChanged) tools.value = snapshot.tools ?? []
+        catalogRevision = snapshot.catalogRevision
+      } finally {
+        runtimeLoadPromise = null
+      }
+    })()
+    return runtimeLoadPromise
   }
 
   const loadAll = async () => {
     loading.value = true
     try {
-      const [serverList, statusList, ep, claude, codex] = await Promise.all([
+      const [serverList, , ep, claude, codex] = await Promise.all([
         fetchMcpServers(),
-        fetchMcpStatuses(),
+        refreshStatuses(),
         fetchMcpEndpoint(),
         fetchInjectionStatus('claude'),
         fetchInjectionStatus('codex'),
       ])
+      if (disposed) return
       servers.value = serverList ?? []
-      applyStatuses(statusList ?? [])
       endpoint.value = ep
       injections.claude = claude
       injections.codex = codex
     } catch (error) {
-      showToast(getErrorMessage(error, t('components.mcp.messages.loadFailed')), 'error')
+      if (!disposed) showToast(getErrorMessage(error, t('components.mcp.messages.loadFailed')), 'error')
     } finally {
-      loading.value = false
+      if (!disposed) loading.value = false
     }
   }
 
@@ -333,6 +351,7 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
   return {
     servers,
     statuses,
+    tools,
     endpoint,
     loading,
     injections,

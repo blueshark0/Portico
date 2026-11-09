@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"database/sql"
 	"log"
 	"sync"
 	"time"
@@ -33,6 +34,7 @@ func sharedPricingService() *modelpricing.Service {
 const statsCacheTTL = 5 * time.Minute
 
 type SQLiteQueries struct {
+	dbName  string
 	pricing *modelpricing.Service
 
 	statsCache         *ttlCache[observabilitydomain.LogStats]
@@ -40,8 +42,9 @@ type SQLiteQueries struct {
 	heatmapCache       *ttlCache[[]observabilitydomain.HeatmapStat]
 }
 
-func NewSQLiteQueries() *SQLiteQueries {
-	return &SQLiteQueries{
+// NewSQLiteQueries 默认使用应用的只读池；测试可传入独立连接名以隔离数据库。
+func NewSQLiteQueries(dbNames ...string) *SQLiteQueries {
+	q := &SQLiteQueries{
 		pricing: sharedPricingService(),
 		// 统计缓存随 request_log 写入失效，TTL 只是兜底：旧的 30s TTL 与前端
 		// 30s 自动刷新同周期，几乎每次刷新都恰好过期、重新聚合。
@@ -49,6 +52,17 @@ func NewSQLiteQueries() *SQLiteQueries {
 		providerDailyCache: newTTLCache(5*time.Minute, cloneProviderDailyStats),
 		heatmapCache:       newTTLCache(5*time.Minute, cloneHeatmapStats),
 	}
+	if len(dbNames) > 0 {
+		q.dbName = dbNames[0]
+	}
+	return q
+}
+
+func (q *SQLiteQueries) readDB() (*sql.DB, error) {
+	if q.dbName != "" {
+		return storage.DB(q.dbName)
+	}
+	return requestLogReadDB()
 }
 
 // decorateRequestLogCost 按当前定价表计算一条日志的费用明细与档位。

@@ -108,6 +108,9 @@ const syncMockActiveMapping = (provider: any) => {
   provider.modelMapping = active ? clone(active.mapping) : {}
 }
 
+let catalogRevision = 1
+let catalogFingerprint = ''
+
 // methodID → handler；未知 ID 返回 null（与真实运行时「方法存在但零值」行为接近）。
 const handlers: Record<number, (...args: any[]) => any> = {
   // routingfacade
@@ -231,6 +234,13 @@ const handlers: Record<number, (...args: any[]) => any> = {
   },
 
   // sessionfacade
+  246191168: (limit: number) => clone(
+    ['claude', 'codex', 'gemini'].flatMap((platform) => mockSessions(platform))
+      .sort((a, b) => new Date(b.last_success_at).getTime() - new Date(a.last_success_at).getTime())
+      .slice(0, Math.min(limit > 0 ? limit : 5, 50))
+      .map(({ platform, session_id, provider_name, last_success_at, created_at }) =>
+        ({ platform, session_id, provider_name, last_success_at, created_at })),
+  ),
   2856418829: (platform: string) => clone(mockSessions(platform)),
   2191426179: (platform: string, sessionID: string) => {
     for (let i = mockRequestLogs.length - 1; i >= 0; i--) {
@@ -253,6 +263,20 @@ const handlers: Record<number, (...args: any[]) => any> = {
   },
 
   // mcpgatewayfacade
+  3219733437: (knownRevision: number) => {
+    const enabled = new Set(mockMcpServers.filter((server) => server.enabled).map((server) => server.id))
+    const tools = mockMcpTools.filter((tool) => enabled.has(tool.serverId))
+    const fingerprint = JSON.stringify(tools)
+    if (fingerprint !== catalogFingerprint) {
+      catalogFingerprint = fingerprint
+      catalogRevision += 1
+    }
+    const catalogChanged = knownRevision !== catalogRevision
+    return {
+      statuses: handlers[2403049257](), catalogRevision, catalogChanged,
+      ...(catalogChanged ? { tools: clone(tools) } : {}),
+    }
+  },
   787164027: () => clone(mockMcpServers),
   1788497038: (server: any) => {
     if (server.id) {

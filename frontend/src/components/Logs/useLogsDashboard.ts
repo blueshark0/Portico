@@ -53,6 +53,7 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
   let timer: number | undefined
   let dashboardLoadPromise: Promise<void> | null = null
   let queuedDashboardReload = false
+  let disposed = false
   const rangeOptions = computed(() =>
     LOG_RANGE_OPTIONS.map((value) => ({
       value,
@@ -83,6 +84,7 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
   }
 
   const loadDashboard = (options: { skipIfLoading?: boolean } = {}) => {
+    if (disposed) return null
     if (dashboardLoadPromise) {
       return options.skipIfLoading ? null : dashboardLoadPromise
     }
@@ -113,6 +115,7 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
               return null
             }),
           ])
+          if (disposed) return
           summaryStats.value = statsData ?? null
           const nextLogs = logData?.items ?? []
           logs.value = nextLogs
@@ -125,11 +128,11 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
           } else {
             page.value = logData?.page ?? requestedPage
           }
-        } while (queuedDashboardReload)
+        } while (queuedDashboardReload && !disposed)
       } catch (error) {
         console.error('failed to load dashboard data', error)
       } finally {
-        loading.value = false
+        if (!disposed) loading.value = false
         dashboardLoadPromise = null
       }
     })()
@@ -138,8 +141,10 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
   }
 
   const loadProviderOptions = async () => {
+    if (disposed) return
     try {
       const list = await fetchLogProviders(filters.platform)
+      if (disposed) return
       providerOptions.value = list ?? []
       if (filters.provider && !providerOptions.value.includes(filters.provider)) {
         filters.provider = ''
@@ -158,6 +163,7 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
 
   const startCountdown = () => {
     stopCountdown()
+    if (disposed || document.hidden) return
     timer = window.setInterval(() => {
       if (countdown.value <= 1) {
         countdown.value = REFRESH_INTERVAL
@@ -241,6 +247,7 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
           page: exportPage,
           pageSize: exportPageSize,
         })
+        if (disposed) return
         all.push(...(data?.items ?? []))
         total = data?.total ?? 0
         exportPage += 1
@@ -295,11 +302,14 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
 
   onMounted(async () => {
     await Promise.all([loadDashboard(), loadProviderOptions()])
+    if (disposed) return
     startCountdown()
     document.addEventListener('visibilitychange', handleVisibilityChange)
   })
 
   onUnmounted(() => {
+    disposed = true
+    queuedDashboardReload = false
     stopCountdown()
     document.removeEventListener('visibilitychange', handleVisibilityChange)
   })

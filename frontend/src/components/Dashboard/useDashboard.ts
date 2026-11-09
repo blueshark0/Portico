@@ -2,7 +2,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { providerTabs, type ProviderTab } from '../../constants/platforms'
 import { fetchRouteProfile, type RouteProfile } from '../../services/routing'
 import { disableProxy, enableProxy, fetchProxyStatus } from '../../services/claudeSettings'
-import { fetchPlatformSessions, type SessionBinding } from '../../services/sessions'
+import { fetchRecentSessions } from '../../services/sessions'
 import {
   fetchInjectionStatus,
   fetchMcpEndpoint,
@@ -12,7 +12,6 @@ import {
   type UpstreamStatus,
 } from '../../services/mcp'
 import { getErrorMessage } from '../../utils/errors'
-import { parseDateTime } from '../../utils/dateTime'
 import { showToast } from '../../utils/toast'
 import { useQuickSwitch } from '../../composables/useQuickSwitch'
 
@@ -100,25 +99,32 @@ export const useDashboard = () => {
   const load = async () => {
     loading.value = true
     try {
-      const [statusList, serverList, endpoint, claudeInjected, codexInjected] = await Promise.all([
+      const [statusList, serverList, endpoint, claudeInjected, codexInjected, bindings] = await Promise.all([
         fetchMcpStatuses(),
         fetchMcpServers(),
         fetchMcpEndpoint(),
         fetchInjectionStatus('claude'),
         fetchInjectionStatus('codex'),
+        fetchRecentSessions(5),
       ])
       mcpStatuses.value = statusList ?? []
       mcpServers.value = serverList ?? []
       mcpEndpoint.value = endpoint
       mcpInjected.value = { claude: claudeInjected, codex: codexInjected }
+      recentSessions.value = (bindings ?? []).map((binding) => ({
+        platform: binding.platform as ProviderTab,
+        platformLabel: providerTabs.find((tab) => tab.id === binding.platform)?.label ?? binding.platform,
+        providerName: binding.provider_name,
+        sessionId: binding.session_id,
+        lastSuccessAt: binding.last_success_at,
+      }))
 
       // 并行拉取各平台数据；用返回值而非 push，保证 clients 顺序恒为 providerTabs 声明顺序。
       const results = await Promise.all(
         providerTabs.map(async (tab) => {
-          const [profile, proxyStatus, bindings] = await Promise.all([
+          const [profile, proxyStatus] = await Promise.all([
             fetchRouteProfile(tab.id),
             fetchProxyStatus(tab.id),
-            fetchPlatformSessions(tab.id),
           ])
           const clientRow: DashboardClient = {
             platform: tab.id,
@@ -126,25 +132,10 @@ export const useDashboard = () => {
             proxyEnabled: Boolean(proxyStatus?.enabled),
             ...providerFields(profile),
           }
-          const sessions: RecentSession[] = (bindings ?? []).map((binding) => ({
-            platform: tab.id,
-            platformLabel: tab.label,
-            providerName: binding.provider_name,
-            sessionId: binding.session_id,
-            lastSuccessAt: binding.last_success_at,
-          }))
-          return { clientRow, sessions }
+          return clientRow
         }),
       )
-      clients.value = results.map((r) => r.clientRow)
-      recentSessions.value = results
-        .flatMap((r) => r.sessions)
-        .sort((a, b) => {
-          const ta = parseDateTime(a.lastSuccessAt, { assumeUTC: true })?.getTime() ?? 0
-          const tb = parseDateTime(b.lastSuccessAt, { assumeUTC: true })?.getTime() ?? 0
-          return tb - ta
-        })
-        .slice(0, 5)
+      clients.value = results
     } finally {
       loading.value = false
     }

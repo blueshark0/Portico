@@ -8,14 +8,11 @@ import McpEditorModal from './McpEditorModal.vue'
 import { useMcpServers } from './useMcpServers'
 import {
   ServerType,
-  fetchMcpTools,
   testMcpConnection,
   type McpServerRecord,
-  type ToolInfo,
 } from '../../services/mcp'
 import { getErrorMessage } from '../../utils/errors'
 import { showToast } from '../../utils/toast'
-import { runWithToast } from '../../utils/runWithToast'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -23,6 +20,7 @@ const router = useRouter()
 const {
   servers,
   statuses,
+  tools,
   editorState,
   confirmState,
   loadAll,
@@ -40,48 +38,20 @@ const {
   confirmDelete,
 } = useMcpServers(t)
 
-const tools = ref<ToolInfo[]>([])
 const selectedId = ref<number | null>(null)
 const menuFor = ref(0)
 const testingId = ref(0)
 
-// 工具清单只随各上游的 toolsRevision 变化；签名不变时无需重拉。
-const toolsSignature = () =>
-  Object.values(statuses.value)
-    .map((st) => `${st.serverId}:${st.toolsRevision}`)
-    .sort()
-    .join(',')
-
-let loadedToolsSignature: string | null = null
-
-const refreshTools = async () => {
-  const signature = toolsSignature()
-  const list = await runWithToast(() => fetchMcpTools(), {
-    fallback: t('mcpPage.messages.toolsLoadFailed'),
-    silent: true,
-  })
-  if (list) {
-    tools.value = list
-    loadedToolsSignature = signature
-  } else {
-    tools.value = []
-    loadedToolsSignature = null // 失败时下一轮重试
-  }
-}
-
 let pollTimer: number | undefined
 let runtimeRefreshing = false
+let disposed = false
 
-// 启用上游后连接是异步完成的；每秒刷新连接状态，避免停留在“连接中”。
-// 完整工具清单（含 InputSchema）只在 toolsRevision 变化后才重新拉取。
+// RuntimeSnapshot 始终刷新状态，仅在 catalogRevision 变化时携带完整工具清单。
 const refreshRuntime = async () => {
-  if (runtimeRefreshing || document.hidden) return
+  if (disposed || runtimeRefreshing || document.hidden) return
   runtimeRefreshing = true
   try {
     await refreshStatuses()
-    if (toolsSignature() !== loadedToolsSignature) {
-      await refreshTools()
-    }
   } finally {
     runtimeRefreshing = false
   }
@@ -89,12 +59,13 @@ const refreshRuntime = async () => {
 
 onMounted(async () => {
   await loadAll()
-  await refreshTools()
+  if (disposed) return
   pollTimer = window.setInterval(() => void refreshRuntime(), 1000)
   window.addEventListener('click', closeMenu)
 })
 
 onUnmounted(() => {
+  disposed = true
   if (pollTimer !== undefined) window.clearInterval(pollTimer)
   window.removeEventListener('click', closeMenu)
 })
@@ -176,7 +147,6 @@ const openDiagnostics = (server?: McpServerRecord) => {
 
 const onSaved = async () => {
   await refreshStatuses()
-  await refreshTools()
 }
 
 const onSubmitEditor = async () => {

@@ -27,7 +27,7 @@ func (q *SQLiteQueries) SessionUsageForSessions(platform string, sessionIDs []st
 		return result, nil
 	}
 
-	db, err := requestLogReadDB()
+	db, err := q.readDB()
 	if err != nil {
 		return nil, err
 	}

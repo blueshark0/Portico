@@ -8,6 +8,7 @@ import (
 	"iter"
 	"log"
 	"net/http"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -71,6 +72,15 @@ type ToolInfo struct {
 	Destructive  bool   `json:"destructive"`
 }
 
+// GatewayRuntimeSnapshot omits the full catalog when the caller already has it.
+// CatalogChanged also distinguishes an emptied catalog from an unchanged one.
+type GatewayRuntimeSnapshot struct {
+	Statuses        []UpstreamStatus `json:"statuses"`
+	CatalogRevision uint64           `json:"catalogRevision"`
+	CatalogChanged  bool             `json:"catalogChanged"`
+	Tools           []ToolInfo       `json:"tools,omitempty"`
+}
+
 const (
 	connectTimeout = 10 * time.Second
 	// sessionTimeout 与 Codex 从不 DELETE 会话（实测 1.8% 关闭率）的行为互补，
@@ -115,11 +125,13 @@ type Aggregator struct {
 	tools  map[string]toolRef
 	genSeq int64
 	// toolsSeq 为各上游 toolsRev 提供全局单调值：记录被删除重建后版本也不会回到旧值。
-	toolsSeq int64
-	closed   bool          // Close 后置位，阻止一切新连接/注册
-	syncCh   chan struct{} // cap 1，合并连续变更
-	stopCh   chan struct{}
-	wg       sync.WaitGroup
+	toolsSeq        int64
+	catalogRevision uint64
+	catalog         []ToolInfo
+	closed          bool          // Close 后置位，阻止一切新连接/注册
+	syncCh          chan struct{} // cap 1，合并连续变更
+	stopCh          chan struct{}
+	wg              sync.WaitGroup
 
 	now func() time.Time // 测试钩子
 }
@@ -138,12 +150,13 @@ type AggregatorOptions struct {
 // NewAggregator 创建聚合器；opts 零值可用（默认 connector、无版本号）。
 func NewAggregator(repo Repository, opts AggregatorOptions) *Aggregator {
 	a := &Aggregator{
-		repo:   repo,
-		ups:    make(map[int64]*upstream),
-		tools:  make(map[string]toolRef),
-		syncCh: make(chan struct{}, 1),
-		stopCh: make(chan struct{}),
-		now:    time.Now,
+		catalogRevision: 1, // revision zero always requests an initial snapshot
+		repo:            repo,
+		ups:             make(map[int64]*upstream),
+		tools:           make(map[string]toolRef),
+		syncCh:          make(chan struct{}, 1),
+		stopCh:          make(chan struct{}),
+		now:             time.Now,
 	}
 	connect := opts.Connector
 	if connect == nil {
@@ -419,6 +432,7 @@ func (a *Aggregator) finishConnect(id int64, gen int64, session UpstreamSession,
 	up.err = ""
 	up.backoffIdx = 0
 	a.registerToolsLocked(up, tools)
+	a.updateCatalogLocked()
 	total := len(a.tools)
 	registered := len(up.toolNames)
 	a.mu.Unlock()
@@ -531,6 +545,7 @@ func (a *Aggregator) refreshTools(id int64, session UpstreamSession, gen int64) 
 		up.toolDetails = nil
 	}
 	a.registerToolsLocked(up, tools)
+	a.updateCatalogLocked()
 	log.Printf("mcpgateway: 上游 %q 工具列表已刷新，当前 %d 个工具", up.cfg.Name, len(up.toolNames))
 }
 
@@ -548,6 +563,7 @@ func (a *Aggregator) detachLocked(up *upstream) {
 		up.toolNames = nil
 		up.toolDetails = nil
 	}
+	a.updateCatalogLocked()
 	session := up.session
 	up.session = nil
 	if session != nil {
@@ -642,6 +658,12 @@ func (a *Aggregator) markFailed(serverID int64, session UpstreamSession, callErr
 func (a *Aggregator) ToolCatalog() []ToolInfo {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	return append([]ToolInfo{}, a.catalog...)
+}
+
+// updateCatalogLocked does sorting/comparison only on registry changes. All
+// fields in ToolInfo are values, so callers can safely receive shallow copies.
+func (a *Aggregator) updateCatalogLocked() {
 	out := make([]ToolInfo, 0, len(a.tools))
 	for _, up := range a.ups {
 		out = append(out, up.toolDetails...)
@@ -652,13 +674,33 @@ func (a *Aggregator) ToolCatalog() []ToolInfo {
 		}
 		return out[i].PublicName < out[j].PublicName
 	})
-	return out
+	if !slices.Equal(out, a.catalog) {
+		a.catalog = out
+		a.catalogRevision++
+	}
+}
+
+func (a *Aggregator) RuntimeSnapshot(knownRevision uint64) GatewayRuntimeSnapshot {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	snapshot := GatewayRuntimeSnapshot{
+		Statuses: a.statusesLocked(), CatalogRevision: a.catalogRevision,
+		CatalogChanged: knownRevision != a.catalogRevision,
+	}
+	if snapshot.CatalogChanged {
+		snapshot.Tools = append([]ToolInfo{}, a.catalog...)
+	}
+	return snapshot
 }
 
 // Statuses 全部上游（含 disabled）的状态快照。
 func (a *Aggregator) Statuses() []UpstreamStatus {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	return a.statusesLocked()
+}
+
+func (a *Aggregator) statusesLocked() []UpstreamStatus {
 	statuses := make([]UpstreamStatus, 0, len(a.ups))
 	for id, up := range a.ups {
 		statuses = append(statuses, UpstreamStatus{

@@ -5,6 +5,7 @@ import {
   Inject,
   List,
   ListTools,
+  RuntimeSnapshot,
   RemoveInjection,
   Save,
   SetEnabled,
@@ -36,3 +37,5 @@ export const injectMcp = (platform: string): Promise<void> => Inject(platform)
 export const removeMcpInjection = (platform: string): Promise<void> => RemoveInjection(platform)
 
 export const fetchMcpTools = (): Promise<ToolInfo[]> => ListTools()
+
+export const fetchMcpRuntimeSnapshot = (knownRevision: number) => RuntimeSnapshot(knownRevision)
