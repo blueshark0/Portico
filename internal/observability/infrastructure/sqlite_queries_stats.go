@@ -7,7 +7,6 @@ import (
 	"time"
 
 	observabilitydomain "portico/internal/observability/domain"
-	"portico/internal/shared/storage"
 )
 
 func (q *SQLiteQueries) HeatmapStats(days int) ([]observabilitydomain.HeatmapStat, error) {
@@ -28,7 +27,7 @@ func (q *SQLiteQueries) HeatmapStats(days int) ([]observabilitydomain.HeatmapSta
 		rangeStart = rangeStart.Add(-time.Duration(totalHours-1) * time.Hour)
 	}
 
-	db, err := storage.DB(storage.RequestLogDBName)
+	db, err := requestLogReadDB()
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +109,9 @@ func (q *SQLiteQueries) StatsSince(platform string, provider string, rangeKey st
 	rangeSpec := buildLogRangeSpec(rangeKey, timeNow())
 	normalizedCostTier := normalizeRequestLogCostTier(costTier)
 	normalizedHTTPStatus := normalizeRequestLogHTTPStatus(httpStatus)
-	cacheKey := fmt.Sprintf("platform:%s|provider:%s|range:%s|cost:%s|http:%s", platform, provider, rangeSpec.key, normalizedCostTier, normalizedHTTPStatus)
+	// key 带上区间起点：跨过零点后"今天/近 N 天"的区间整体后移，不能复用旧结果。
+	cacheKey := fmt.Sprintf("platform:%s|provider:%s|range:%s|start:%s|cost:%s|http:%s", platform, provider, rangeSpec.key, rangeSpec.startUTCString(), normalizedCostTier, normalizedHTTPStatus)
+	cacheVersion := q.statsCache.Version()
 	if cached, ok := q.statsCache.Get(cacheKey); ok {
 		return cached, nil
 	}
@@ -119,7 +120,7 @@ func (q *SQLiteQueries) StatsSince(platform string, provider string, rangeKey st
 	}
 	seriesBuckets, bucketIndexes := newStatsSeriesBuckets(rangeSpec)
 
-	db, err := storage.DB(storage.RequestLogDBName)
+	db, err := requestLogReadDB()
 	if err != nil {
 		return stats, err
 	}
@@ -235,7 +236,7 @@ func (q *SQLiteQueries) StatsSince(platform string, provider string, rangeKey st
 	}
 
 	appendStatsSeries(&stats, seriesBuckets)
-	return q.statsCache.Set(cacheKey, stats), nil
+	return q.statsCache.SetVersion(cacheKey, stats, cacheVersion), nil
 }
 
 // utcBoundString 把本地时间边界转成与 created_at 落库格式（UTC 字符串）可比较的形式。
@@ -283,7 +284,7 @@ func (q *SQLiteQueries) ProviderDailyStats(platform string) ([]observabilitydoma
 	start := startOfDay(time.Now())
 	end := start.Add(24 * time.Hour)
 
-	db, err := storage.DB(storage.RequestLogDBName)
+	db, err := requestLogReadDB()
 	if err != nil {
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"portico/internal/shared/storage"
@@ -17,6 +18,18 @@ const RequestLogRetentionDays = 30
 const requestLogCheckpointThreshold = 1000
 
 var requestLogWriteMu sync.Mutex
+
+// requestLogDataVersion 在 request_log 每次成功写入/删除后递增，供统计缓存
+// 判断结果是否仍然有效（见 ttlCache 的 version）。
+var requestLogDataVersion atomic.Uint64
+
+func currentRequestLogDataVersion() uint64 {
+	return requestLogDataVersion.Load()
+}
+
+func markRequestLogDataChanged() {
+	requestLogDataVersion.Add(1)
+}
 
 func boolToInt(b bool) int {
 	if b {
@@ -53,6 +66,7 @@ func CleanupOldRequestLogs(retentionDays int) error {
 		return err
 	}
 	if rows, err := res.RowsAffected(); err == nil && rows > 0 {
+		markRequestLogDataChanged()
 		log.Printf("清理 %d 条过期 request_log 记录\n", rows)
 		if rows >= requestLogCheckpointThreshold {
 			if _, err := db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
@@ -217,6 +231,7 @@ func backfillRequestLogCosts(db *sql.DB, pricing *modelpricing.Service) error {
 		return err
 	}
 	committed = true
+	markRequestLogDataChanged()
 	log.Printf("已为 %d 条历史 request_log 记录回填费用列\n", len(updates))
 	return nil
 }

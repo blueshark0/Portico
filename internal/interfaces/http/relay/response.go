@@ -11,8 +11,12 @@ import (
 )
 
 // relayResponseHook 观察响应片段；返回 false 时仅对流式响应跳过写出。
-// 当前 relay 的 hook 都只观察并原样返回数据，不能用 parse→marshal 改写响应。
+// 当前 relay 的 hook 都只观察并原样返回数据，不能用 parse→marshal 改写响应；
+// 非流式路径边读边转发，hook 在读完后才看到完整 body，其返回值被忽略。
 type relayResponseHook func(data []byte) (bool, []byte)
+
+// bufferedCopyChunkSize 是非流式响应转发时单次读取的大小。
+const bufferedCopyChunkSize = 32 * 1024
 
 func copyUpstreamResponseHeaders(dst, src http.Header) {
 	for key, values := range src {
@@ -43,20 +47,58 @@ func writeUpstreamResponse(w http.ResponseWriter, resp *http.Response, hook rela
 
 // writeBufferedUpstreamResponse 也用于非 2xx：即使上游声明了 SSE，错误响应仍按
 // 原来的非流式路径透传，并让 collector 看到完整错误体。
+//
+// 字节一到就转发给客户端，不再先 io.ReadAll 读完整个 body 再写：大响应的
+// 首字节不必等上游发完。hook（usage 解析、首包计时、错误体收集）仍只在读完后
+// 拿到一份完整 body，保证非流式 JSON 不被切碎；无 hook 时不保留副本。
 func writeBufferedUpstreamResponse(w http.ResponseWriter, resp *http.Response, hook relayResponseHook) (int64, error) {
 	writeUpstreamResponseHeaders(w, resp)
 	if resp.Body == nil {
 		return 0, nil
 	}
-	body, readErr := io.ReadAll(resp.Body)
-	written, writeErr := writeResponseBytes(w, body, hook, false)
-	if writeErr != nil {
-		return written, writeErr
+	var observed []byte
+	if hook != nil {
+		observed = make([]byte, 0, bufferedCopyChunkSize)
 	}
+	buf := make([]byte, bufferedCopyChunkSize)
+	var total int64
+	var readErr error
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			chunk := buf[:n]
+			if hook != nil {
+				observed = append(observed, chunk...)
+			}
+			written, writeErr := writeResponseBytes(w, chunk, nil, false)
+			total += written
+			if writeErr != nil {
+				observeBufferedResponse(hook, observed)
+				return total, writeErr
+			}
+		}
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				readErr = err
+			}
+			break
+		}
+	}
+	observeBufferedResponse(hook, observed)
 	if readErr != nil {
-		return written, fmt.Errorf("read upstream response: %w", readErr)
+		return total, fmt.Errorf("read upstream response: %w", readErr)
 	}
-	return written, nil
+	return total, nil
+}
+
+func observeBufferedResponse(hook relayResponseHook, body []byte) {
+	if hook == nil {
+		return
+	}
+	if body == nil {
+		body = []byte{}
+	}
+	hook(body)
 }
 
 // writeSSEUpstreamResponse 使用小缓冲读取首行，但不等待凑满 1024 字节。
