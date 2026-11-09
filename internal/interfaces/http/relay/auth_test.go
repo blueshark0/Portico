@@ -16,7 +16,7 @@ func TestIsAuthorizedInboundRequest(t *testing.T) {
 		want   bool
 	}{
 		{name: "claude bearer placeholder", header: map[string]string{"Authorization": "Bearer portico"}, want: true},
-		{name: "bearer prefix case-insensitive", header: map[string]string{"Authorization": "bearer CODE-SWITCH"}, want: true},
+		{name: "bearer prefix case-insensitive", header: map[string]string{"Authorization": "bearer PORTICO"}, want: true},
 		{name: "raw token in authorization", header: map[string]string{"Authorization": "portico"}, want: true},
 		{name: "x-api-key placeholder", header: map[string]string{"X-Api-Key": "portico"}, want: true},
 		{name: "gemini header placeholder", header: map[string]string{"X-Goog-Api-Key": "portico"}, want: true},

@@ -87,7 +87,7 @@ func (s *Service) GetRemoteSnapshotMeta(ctx context.Context) (configsyncdomain.R
 		return configsyncdomain.RemoteSnapshotMeta{}, err
 	}
 
-	payload, err := s.downloadRemoteSnapshot(ctx, settings)
+	payload, err := s.remote.Download(ctx, settings, configsyncdomain.RemoteSnapshotFile)
 	if err != nil {
 		if errors.Is(err, ErrRemoteSnapshotNotFound) {
 			return configsyncdomain.RemoteSnapshotMeta{}, nil
@@ -122,14 +122,6 @@ func (s *Service) PushSnapshot(ctx context.Context, ui configsyncdomain.UIPrefer
 	return meta, nil
 }
 
-func (s *Service) downloadRemoteSnapshot(ctx context.Context, settings configsyncdomain.SyncSettings) ([]byte, error) {
-	payload, err := s.remote.Download(ctx, settings, configsyncdomain.RemoteSnapshotFile)
-	if !errors.Is(err, ErrRemoteSnapshotNotFound) {
-		return payload, err
-	}
-	return s.remote.Download(ctx, settings, configsyncdomain.LegacyRemoteSnapshotFile)
-}
-
 func (s *Service) PullSnapshot(ctx context.Context) (configsyncdomain.ConfigSnapshot, error) {
 	settings, err := s.GetSyncSettings(ctx)
 	if err != nil {
@@ -139,7 +131,7 @@ func (s *Service) PullSnapshot(ctx context.Context) (configsyncdomain.ConfigSnap
 		return configsyncdomain.ConfigSnapshot{}, err
 	}
 
-	payload, err := s.downloadRemoteSnapshot(ctx, settings)
+	payload, err := s.remote.Download(ctx, settings, configsyncdomain.RemoteSnapshotFile)
 	if err != nil {
 		return configsyncdomain.ConfigSnapshot{}, err
 	}

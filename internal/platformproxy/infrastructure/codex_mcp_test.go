@@ -95,34 +95,6 @@ func TestCodexInjectPreservesExistingContent(t *testing.T) {
 	}
 }
 
-func TestCodexInjectReplacesLegacyEntry(t *testing.T) {
-	m := newCodexManager(t)
-	seed := "[mcp_servers.code-switch]\nurl = \"http://127.0.0.1:18100/mcp\"\n\n[mcp_servers.user-own]\ncommand = \"x\"\n"
-	if err := os.MkdirAll(filepath.Dir(codexConfigPath(t)), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(codexConfigPath(t), []byte(seed), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := m.InjectMcp(); err != nil {
-		t.Fatal(err)
-	}
-	raw, err := m.readRawConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	servers := raw["mcp_servers"].(map[string]any)
-	if _, ok := servers[legacyMcpEntryName]; ok {
-		t.Fatal("旧 MCP 条目应被移除")
-	}
-	if _, ok := servers[mcpEntryName]; !ok {
-		t.Fatal("新 MCP 条目应被注入")
-	}
-	if _, ok := servers["user-own"]; !ok {
-		t.Fatal("用户条目应保留")
-	}
-}
-
 func TestCodexInjectIdempotentSkipsWrite(t *testing.T) {
 	m := newCodexManager(t)
 	if err := m.InjectMcp(); err != nil {

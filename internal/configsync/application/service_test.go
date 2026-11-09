@@ -119,28 +119,6 @@ func newSyncTestService(t *testing.T, remote *fakeRemote) (*Service, *syncRoutin
 	return service, routingRepo
 }
 
-func TestLegacyRemoteSnapshotCanBeRead(t *testing.T) {
-	remote := newFakeRemote()
-	service, _ := newSyncTestService(t, remote)
-	ctx := context.Background()
-	if _, err := service.PushSnapshot(ctx, configsyncdomain.UIPreferences{Theme: "dark", Locale: "zh"}); err != nil {
-		t.Fatal(err)
-	}
-	remote.files[configsyncdomain.LegacyRemoteSnapshotFile] = remote.files[configsyncdomain.RemoteSnapshotFile]
-	delete(remote.files, configsyncdomain.RemoteSnapshotFile)
-
-	meta, err := service.GetRemoteSnapshotMeta(ctx)
-	if err != nil {
-		t.Fatalf("read legacy snapshot meta: %v", err)
-	}
-	if !meta.Exists || meta.DeviceName != "test-device" {
-		t.Fatalf("unexpected legacy snapshot meta: %+v", meta)
-	}
-	if _, err := service.PullSnapshot(ctx); err != nil {
-		t.Fatalf("pull legacy snapshot: %v", err)
-	}
-}
-
 func TestPushThenPullSnapshotEndToEnd(t *testing.T) {
 	remote := newFakeRemote()
 	service, _ := newSyncTestService(t, remote)

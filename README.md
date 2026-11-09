@@ -80,7 +80,7 @@ Grab a build from [**Releases**](https://github.com/blueshark0/Portico/releases/
 | Arch Linux · x86_64 | `portico-linux-amd64.pkg.tar.zst` |
 | Other Linux · x86_64 | `portico-linux-amd64.AppImage` |
 
-Releases currently target x86_64 Linux only. Other platforms can [build from source](#building-from-source). The packages depend on GTK 4 and WebKitGTK 6.0.
+Releases currently target x86_64 Linux only. Other platforms can [build from source](#building-from-source). The packages need GTK 4.14 or newer and WebKitGTK 6.0, for example Ubuntu 24.04 or Debian 13.
 
 <!-- macOS and Windows releases are paused. Restore these rows and notes together with release.yml.
 | macOS · Apple Silicon | `portico-macos-arm64.zip` |
@@ -98,8 +98,6 @@ xattr -cr /Applications/Portico.app
 
 **Windows.** The NSIS installer bootstraps the WebView2 runtime if needed; the portable executable requires WebView2 to be installed already.
 -->
-
-**Upgrading from Code Switch.** On first launch Portico renames `~/.code-switch` to `~/.portico`, keeping your profiles, request logs and proxy state (an existing `~/.portico` is never touched). The legacy `code-switch` placeholder token is still accepted, so an existing CLI integration keeps working; re-enable it once to move fully to the new placeholder.
 
 ## Quick start
 

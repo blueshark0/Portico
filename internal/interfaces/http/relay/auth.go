@@ -11,10 +11,7 @@ import (
 // （ANTHROPIC_AUTH_TOKEN / OPENAI_API_KEY / GEMINI_API_KEY = "portico"）。
 // 即使监听地址已收敛到 127.0.0.1，仍校验入站凭证，防止本机其他用户或
 // 恶意程序直接借用代理消耗已配置的付费 API key。
-const (
-	relayInboundToken       = "portico"
-	legacyRelayInboundToken = "code-switch"
-)
+const relayInboundToken = "portico"
 
 func (s *Server) inboundAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -46,5 +43,5 @@ func isAuthorizedInboundRequest(r *http.Request) bool {
 func matchesInboundToken(value string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(value))
 	normalized = strings.TrimSpace(strings.TrimPrefix(normalized, "bearer "))
-	return normalized == relayInboundToken || normalized == legacyRelayInboundToken
+	return normalized == relayInboundToken
 }

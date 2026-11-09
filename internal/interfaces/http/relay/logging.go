@@ -15,7 +15,7 @@ import (
 // 错误页撑爆单条日志（app_log_reader 的回扫窗口为 2MB）。
 const maxUpstreamErrorBodyBytes = 8 * 1024
 
-var relayDebugEnabled = os.Getenv("PORTICO_DEBUG_RELAY") == "1" || os.Getenv("CODE_SWITCH_DEBUG_RELAY") == "1"
+var relayDebugEnabled = os.Getenv("PORTICO_DEBUG_RELAY") == "1"
 
 func relayDebugf(format string, args ...any) {
 	if !relayDebugEnabled {
