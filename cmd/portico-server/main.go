@@ -17,6 +17,7 @@ import (
 	"portico/frontend"
 	appbootstrap "portico/internal/app/bootstrap"
 	"portico/internal/interfaces/http/admin"
+	"portico/internal/interfaces/tui"
 	"portico/internal/shared/buildinfo"
 	"portico/internal/shared/serverinfo"
 )
@@ -25,6 +26,7 @@ const usage = `用法: portico-server [命令] [参数]
 
 命令:
   serve          启动服务（默认）
+  tui            终端管理界面（连接本机或远程的 portico-server）
   token show     显示访问令牌与带令牌的访问地址
   token reset    重新生成访问令牌（运行中的服务立即生效，旧令牌失效）
   version        显示版本
@@ -34,6 +36,11 @@ serve 参数（也可用对应环境变量设置，命令行参数优先）:
   --tls-cert FILE           HTTPS 证书（PORTICO_ADMIN_TLS_CERT）
   --tls-key FILE            HTTPS 私钥（PORTICO_ADMIN_TLS_KEY）
   --always-require-token    本机请求也要求令牌，部署在反向代理之后时必须开启（PORTICO_ADMIN_ALWAYS_TOKEN=1）
+
+tui 参数:
+  --url URL                 管理地址（PORTICO_ADMIN_URL，默认读取本机运行时信息，否则 http://` + serverinfo.DefaultAdminAddr + `）
+  --token TOKEN             访问令牌（PORTICO_ADMIN_TOKEN；本机地址自动读取令牌文件。
+                            建议用环境变量传入，命令行参数会出现在进程列表中）
 `
 
 func main() {
@@ -47,6 +54,8 @@ func main() {
 	switch command {
 	case "serve":
 		err = runServe(args)
+	case "tui":
+		err = runTUI(args)
 	case "token":
 		err = runToken(args)
 	case "version":
@@ -180,6 +189,18 @@ func runServe(args []string) error {
 		log.Println("收到停止请求，正在退出")
 	}
 	return nil
+}
+
+func runTUI(args []string) error {
+	var flagURL, flagToken string
+	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
+	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+	fs.StringVar(&flagURL, "url", "", "")
+	fs.StringVar(&flagToken, "token", "", "")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return tui.Run(tui.ResolveTarget(flagURL, flagToken))
 }
 
 func runToken(args []string) error {

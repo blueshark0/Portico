@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Portico (Go backend + Vue 3/TypeScript frontend) runs a loopback relay on `127.0.0.1:18100` (fixed port) in front of Claude Code, Codex and Gemini CLI. It rewrites each CLI's config to point at the relay, routes requests to a user-chosen provider, records usage and cost, and aggregates MCP servers behind `/mcp`. All data lives in `~/.portico/`.
 
-It runs as two processes:
+It runs as two processes (plus an optional terminal client, `portico-server tui`):
 - **`portico-server`** (`cmd/portico-server`, pure Go, no cgo) owns everything: the relay, CLI config patching, the MCP gateway, the databases, and the management API + embedded web UI on `127.0.0.1:18101` (configurable, token-protected for non-local clients). It runs headless on servers.
 - **The desktop app** (`main.go`, Wails 3) is only a window, tray and dock shell. On launch it reuses a running backend (found via `~/.portico/server.json`) or spawns the bundled `portico-server` next to its executable, then loads the backend's web UI in its window. Quitting the window does not stop the backend. The desktop shell links none of the backend packages.
 
@@ -53,11 +53,12 @@ Each context under `internal/` (`routing`, `sessions`, `observability`, `platfor
 - `internal/interfaces/wails/`: `*Facade` types exposed to the UI. Despite the package name they are no longer Wails services at runtime: the admin server dispatches to them by reflection. Their exported methods become the TS functions in `frontend/bindings/portico/internal/interfaces/wails/<facade>`.
 - `internal/interfaces/http/admin/`: the management server on its own listener (default `127.0.0.1:18101`). `GET /api/health` (no auth), `POST /api/rpc/{Facade}.{Method}` (JSON array of args), `POST /api/shutdown`, and the embedded web UI. `auth.go`: non-local requests need `Authorization: Bearer <token>` (`~/.portico/admin_token`); loopback address *and* loopback `Host` are exempt unless `--always-require-token`; cross-site browser requests are always rejected.
 - `internal/interfaces/http/relay/`: Gin HTTP server for the CLI relay, which also mounts the MCP gateway at `/mcp`. It must only ever listen on loopback, otherwise LAN hosts could use the configured paid API keys. Only the admin port may be exposed.
+- `internal/interfaces/tui/`: the terminal UI (`portico-server tui`, Bubble Tea). It is a client of the admin API, not an in-process view: it holds no store or service and can manage a remote server. `client.go` calls facades by string name (`"RoutingFacade.GetProfile"`) with positional args, so renaming or re-signing a facade method does not break the TUI's build; update `client.go` too. Its tests use fake facades and won't catch this.
 
 `internal/app/bootstrap/container.go` is the composition root. It builds every store/service/facade and wires the relay with injected options (session cache, request-log sink, token parser per platform, MCP gateway). `Container.Facades()` lists what the admin RPC exposes. New facades must be added there **and** to `cmd/bindgen/main.go`, which exists only so `wails3 generate bindings` can discover the types.
 
 Process plumbing:
-- `cmd/portico-server/main.go`: subcommands `serve` (default), `token show|reset`, `version`. Admin flags have env equivalents: `--listen`/`PORTICO_ADMIN_LISTEN`, `--tls-cert`/`--tls-key`/`PORTICO_ADMIN_TLS_*`, `--always-require-token`/`PORTICO_ADMIN_ALWAYS_TOKEN=1`.
+- `cmd/portico-server/main.go`: subcommands `serve` (default), `tui`, `token show|reset`, `version`. Admin flags have env equivalents: `--listen`/`PORTICO_ADMIN_LISTEN`, `--tls-cert`/`--tls-key`/`PORTICO_ADMIN_TLS_*`, `--always-require-token`/`PORTICO_ADMIN_ALWAYS_TOKEN=1`. `tui` takes `--url`/`PORTICO_ADMIN_URL` and `--token`/`PORTICO_ADMIN_TOKEN`; by default it finds the local backend through `server.json`, and it only reads the local token file when the target is a loopback address, so that token is never sent to a remote server.
 - `internal/shared/serverinfo`: the shared contract between server and shell (default admin address, token file, `~/.portico/server.json` runtime info written on start and removed on exit).
 - `internal/app/sidecar` (no Wails dependency, testable headless): the shell discovers a running backend, otherwise spawns `portico-server` from its own directory as a detached process, and can ask it to stop.
 - `internal/app/desktop`: window/tray/dock shell plus the local loading/error page shown before the backend is reachable.
