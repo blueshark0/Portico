@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"database/sql"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -10,13 +11,13 @@ import (
 	"portico/internal/shared/storage"
 )
 
-func TestListRequestLogs_OrdersByIDDesc(t *testing.T) {
+func TestListRequestLogs_OrdersByCreatedAtDescWithIDTieBreak(t *testing.T) {
 	loc := time.FixedZone("UTC+8", 8*60*60)
 	now := time.Date(2026, time.March, 16, 12, 0, 0, 0, loc)
 	db := setupRangeQueryTestDB(t)
 	setRangeTestClock(t, now)
 
-	// 插入顺序与 created_at 顺序故意不一致；分页始终按 id 倒序，避免迟到写入改变顺序。
+	// 插入顺序与 created_at 顺序故意不一致；同一秒两条以 id 倒序排列。
 	seedRequestLog(t, db, time.Date(2026, time.March, 16, 9, 0, 0, 0, loc), "claude", "alpha", "m-0900")
 	seedRequestLog(t, db, time.Date(2026, time.March, 16, 11, 0, 0, 0, loc), "claude", "alpha", "m-1100-a")
 	seedRequestLog(t, db, time.Date(2026, time.March, 16, 10, 0, 0, 0, loc), "claude", "alpha", "m-1000")
@@ -30,18 +31,15 @@ func TestListRequestLogs_OrdersByIDDesc(t *testing.T) {
 	for _, item := range page.Items {
 		got = append(got, item.Model)
 	}
-	want := []string{"m-1100-b", "m-1000", "m-1100-a", "m-0900"}
+	want := []string{"m-1100-b", "m-1100-a", "m-1000", "m-0900"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("unexpected order: got %v want %v", got, want)
 	}
 }
 
-// 分页先在 CTE 中物化当前页 ID，再按主键读取这些宽行；过滤仍可走 created_at 索引。
-func TestRequestLogPageSQL_MaterializesIDsBeforeWideRows(t *testing.T) {
-	db := setupRangeQueryTestDB(t)
-	where, args := requestLogListWhere("", "", "last7days", "all", "all")
-	args = append(args, 200, 0)
-	rows, err := db.Query("EXPLAIN QUERY PLAN "+requestLogPageSQL(where), args...)
+func explainQueryPlan(t *testing.T, db *sql.DB, query string, args ...any) string {
+	t.Helper()
+	rows, err := db.Query("EXPLAIN QUERY PLAN "+query, args...)
 	if err != nil {
 		t.Fatalf("explain: %v", err)
 	}
@@ -55,12 +53,53 @@ func TestRequestLogPageSQL_MaterializesIDsBeforeWideRows(t *testing.T) {
 		}
 		plan = append(plan, detail)
 	}
-	joined := strings.Join(plan, "\n")
-	if !strings.Contains(joined, "idx_request_log_created_at") {
-		t.Fatalf("expected page ID filtering to use idx_request_log_created_at:\n%s", joined)
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read plan: %v", err)
 	}
-	if !strings.Contains(joined, "SEARCH request_log USING INTEGER PRIMARY KEY") {
-		t.Fatalf("expected wide rows to be fetched by primary key:\n%s", joined)
+	return strings.Join(plan, "\n")
+}
+
+// 分页 ID 必须沿索引顺序取前 N 行，不能退化为把整个时间范围的行取出后再排序；
+// 否则默认视图每页都要遍历 7 天内的全部行。外层只对当前页的宽行排序，不受此限。
+func TestRequestLogPageIDsSQL_UsesIndexOrder(t *testing.T) {
+	db := setupRangeQueryTestDB(t)
+	cases := []struct {
+		name, platform, provider, cost, status string
+		wantIndex                              string
+	}{
+		{name: "default", cost: "all", status: "all", wantIndex: "idx_request_log_created_at"},
+		{name: "platform", platform: "claude", cost: "all", status: "all", wantIndex: "idx_request_log_platform_created_at"},
+		{name: "provider", provider: "alpha", cost: "all", status: "all", wantIndex: "idx_request_log_provider_created_at"},
+		{name: "platform_provider", platform: "claude", provider: "alpha", cost: "all", status: "all", wantIndex: "idx_request_log_platform_provider_created_at"},
+		{name: "high_cost", cost: "high", status: "all", wantIndex: "idx_request_log_created_at"},
+		{name: "failed", cost: "all", status: "failed", wantIndex: "idx_request_log_created_at"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			where, args := requestLogListWhere(tc.platform, tc.provider, "last7days", tc.cost, tc.status)
+			args = append(args, 200, 0)
+			plan := explainQueryPlan(t, db, requestLogPageIDsSQL(where), args...)
+			if strings.Contains(plan, "TEMP B-TREE FOR ORDER BY") {
+				t.Fatalf("page IDs sort the whole range instead of using index order:\n%s", plan)
+			}
+			if !strings.Contains(plan, tc.wantIndex) {
+				t.Fatalf("expected page IDs to use %s:\n%s", tc.wantIndex, plan)
+			}
+		})
+	}
+}
+
+// 分页先在 CTE 中物化当前页 ID，再按主键读取这些宽行。
+func TestRequestLogPageSQL_MaterializesIDsBeforeWideRows(t *testing.T) {
+	db := setupRangeQueryTestDB(t)
+	where, args := requestLogListWhere("", "", "last7days", "all", "all")
+	args = append(args, 200, 0)
+	plan := explainQueryPlan(t, db, requestLogPageSQL(where), args...)
+	if !strings.Contains(plan, "idx_request_log_created_at") {
+		t.Fatalf("expected page ID filtering to use idx_request_log_created_at:\n%s", plan)
+	}
+	if !strings.Contains(plan, "SEARCH request_log USING INTEGER PRIMARY KEY") {
+		t.Fatalf("expected wide rows to be fetched by primary key:\n%s", plan)
 	}
 }
 

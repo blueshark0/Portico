@@ -32,13 +32,6 @@ func (i *Initializer) initConnections() error {
 			MaxIdleConn: 1,
 		},
 		{
-			Name:        storage.RequestLogReadDBName,
-			Driver:      "sqlite",
-			DSN:         sqliteDSN(requestLogDBPath),
-			MaxOpenConn: 4,
-			MaxIdleConn: 2,
-		},
-		{
 			Name:        storage.SessionDBName,
 			Driver:      "sqlite",
 			DSN:         sqliteDSN(sessionDBPath),
