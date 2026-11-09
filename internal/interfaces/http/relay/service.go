@@ -43,6 +43,8 @@ type SessionBinder interface {
 	RecordSessionSuccessGeneration(platform, sessionID, providerName string, generation uint64) (current, persist bool)
 	UpdateSessionSuccessGeneration(platform, sessionID string, generation uint64) error
 	ClearPendingSessionSuccess(platform, sessionID string)
+	// RecordSessionBackground 记录 Codex 会话可见性，已知不变时跳过写库。
+	RecordSessionBackground(platform, sessionID string, background bool, generation uint64) error
 }
 
 // TokenUsageParser 与 observability 解析器签名一致（消费端定义接口，
