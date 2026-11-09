@@ -85,8 +85,17 @@ Section
     !insertmacro wails.webview2runtime
 
     SetOutPath $INSTDIR
-    
+
+    # 升级前停止正在运行的后端，否则 portico-server.exe 被占用无法覆盖（SQLite WAL 可安全承受强制结束）。
+    nsExec::Exec 'taskkill /F /IM portico-server.exe'
+
     !insertmacro wails.files
+
+    # 桌面壳从自身所在目录拉起后端 sidecar，二者必须安装在同一目录。
+    !ifndef ARG_PORTICO_SERVER_BINARY
+        !error "ARG_PORTICO_SERVER_BINARY must point to portico-server.exe (makensis -DARG_PORTICO_SERVER_BINARY=...)"
+    !endif
+    File "/oname=portico-server.exe" "${ARG_PORTICO_SERVER_BINARY}"
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
@@ -100,6 +109,9 @@ Section "uninstall"
     !insertmacro wails.setShellContext
 
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
+
+    # 后端退出后才能删除其可执行文件；用户数据在 %USERPROFILE%\.portico，卸载时保留。
+    nsExec::Exec 'taskkill /F /IM portico-server.exe'
 
     RMDir /r $INSTDIR
 

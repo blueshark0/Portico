@@ -8,6 +8,7 @@ import ThemeSetting from '../Setting/ThemeSetting.vue'
 import WebDavSyncSection from './WebDavSyncSection.vue'
 import { useAppSettingsStore } from '../../composables/useAppSettingsStore'
 import { runWithToast } from '../../utils/runWithToast'
+import { clearToken, hasStoredToken } from '../../services/auth'
 
 const { t } = useI18n()
 const {
@@ -53,6 +54,14 @@ const onProxySave = async () => {
   await runWithToast(() => updateSettings({ proxy_url: raw }), {
     fallback: t('components.general.messages.saveFailed'),
   })
+}
+
+// 只有通过令牌登录（远程访问）时才显示退出登录；本机访问免令牌，无需退出。
+const signedInWithToken = hasStoredToken()
+
+const onSignOut = () => {
+  clearToken()
+  window.location.reload()
 }
 
 onMounted(() => {
@@ -115,6 +124,15 @@ onMounted(() => {
       </section>
 
       <WebDavSyncSection @restored="reloadApplicationSettings" />
+
+      <section v-if="signedInWithToken" class="settings-group">
+        <h2 class="cs-card-title">{{ t('auth.sectionTitle') }}</h2>
+        <div class="settings-rows">
+          <ListItem :label="t('auth.signedIn')" :sub-label="t('auth.signedInHint')">
+            <button type="button" class="cs-btn" @click="onSignOut">{{ t('auth.signOut') }}</button>
+          </ListItem>
+        </div>
+      </section>
     </div>
   </div>
 </template>

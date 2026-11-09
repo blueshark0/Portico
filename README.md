@@ -8,7 +8,7 @@
 
 [Claude Code](https://github.com/anthropics/claude-code) · [Codex](https://github.com/openai/codex) · [Gemini CLI](https://github.com/google-gemini/gemini-cli)
 
-[Download](https://github.com/blueshark0/Portico/releases/latest) · [Quick start](#quick-start) · [How it works](#how-it-works) · [MCP gateway](#mcp-gateway) · [Contributing](#contributing)
+[Download](https://github.com/blueshark0/Portico/releases/latest) · [Quick start](#quick-start) · [Headless server](#headless-server) · [How it works](#how-it-works) · [MCP gateway](#mcp-gateway) · [Contributing](#contributing)
 
 **English** · [简体中文](README.zh-CN.md)
 
@@ -20,13 +20,14 @@
 
 </div>
 
-Portico is a cross-platform desktop app that sits between your AI coding CLIs and their API providers. It runs a local relay on `127.0.0.1:18100`, points each CLI at it, and forwards requests to the provider you choose — with session-aware routing, model remapping, per-request usage and cost tracking, and an aggregated MCP endpoint.
+Portico sits between your AI coding CLIs and their API providers. A background service, `portico-server`, runs a local relay on `127.0.0.1:18100`, points each CLI at it, and forwards requests to the provider you choose — with session-aware routing, model remapping, per-request usage and cost tracking, and an aggregated MCP endpoint. You manage it from the desktop app, or from a browser on machines without a desktop.
 
 - **One local address for every CLI.** Switch providers in the app or with the <kbd>⌘K</kbd> / <kbd>Ctrl+K</kbd> palette, without editing CLI config files again.
 - **Routing you can reason about.** Each CLI has a current provider, and a session stays with the provider that served it. No hidden retry chains, no silent fallbacks.
 - **Know what you spend.** Tokens, cache reads and writes, estimated cost, time to first response and total duration for every request.
 - **Transparent by design.** Requests and responses — including SSE streams — are forwarded byte for byte. Only the `model` field and your own body-rewrite rules touch the payload.
 - **Careful with your configs.** Portico patches only the fields it manages, keeps their previous values, and restores them when you turn integration off.
+- **Desktop or headless.** The same backend serves the desktop window and a token-protected web UI, so Portico also runs on servers with no desktop environment.
 
 Built with [Wails 3](https://v3.wails.io) (Go) and Vue 3 + TypeScript. All data stays on your machine.
 
@@ -78,8 +79,9 @@ Grab a build from [**Releases**](https://github.com/blueshark0/Portico/releases/
 | macOS · Apple Silicon | `portico-macos-arm64.zip` |
 | macOS · Intel | `portico-macos-amd64.zip` |
 | Windows · x64 installer | `Portico-amd64-installer.exe` |
-| Windows · x64 portable | `Portico.exe` |
-| Linux | [Build from source](#building-from-source) |
+| Windows · x64 portable | `portico-windows-amd64-portable.zip` |
+| Linux server (headless) · x64 / arm64 | `portico-server-linux-amd64.tar.gz` / `portico-server-linux-arm64.tar.gz` — see [Headless server](#headless-server) |
+| Linux desktop | [Build from source](#building-from-source) |
 
 **macOS.** Unzip and move `Portico.app` to `/Applications`. Release builds are ad-hoc signed, not notarized, so Gatekeeper may refuse the first launch:
 
@@ -89,7 +91,7 @@ xattr -cr /Applications/Portico.app
 
 …or approve the app once under *System Settings → Privacy & Security*.
 
-**Windows.** The NSIS installer bootstraps the WebView2 runtime if needed; the portable executable requires WebView2 to be installed already.
+**Windows.** The NSIS installer bootstraps the WebView2 runtime if needed; the portable build requires WebView2 to be installed already. Keep `Portico.exe` and `portico-server.exe` from the portable zip in the same folder — the desktop app starts the backend from there.
 
 **Upgrading from Code Switch.** On first launch Portico renames `~/.code-switch` to `~/.portico`, keeping your profiles, request logs and proxy state (an existing `~/.portico` is never touched). The legacy `code-switch` placeholder token is still accepted, so an existing CLI integration keeps working; re-enable it once to move fully to the new placeholder.
 
@@ -103,6 +105,40 @@ xattr -cr /Applications/Portico.app
 After that, switching providers is an in-app action — no config editing, no restart. Note that an **existing session keeps its provider**; switching affects new sessions. To move a live session, use *Sessions → Unbind session*, or start a new session in the CLI.
 
 Turning the toggle off restores the previous values. Provider names and API keys are stored locally in `~/.portico/app.db`.
+
+**Quitting the desktop app does not stop the relay.** The backend is a separate process, so your CLIs keep working while the window is closed or the app has quit. Use the tray menu's *Quit and stop service* to stop it as well.
+
+## Headless server
+
+On a machine without a desktop, run the backend directly and manage it from a browser. Run it as the same user that runs the CLIs: Portico edits that user's `~/.claude`, `~/.codex` and `~/.gemini`.
+
+```sh
+tar -xzf portico-server-linux-amd64.tar.gz
+cd portico-server-linux-amd64
+./portico-server --listen 0.0.0.0:18101   # relay stays on 127.0.0.1:18100
+./portico-server token show               # prints the access token and a sign-in link
+```
+
+Open `http://<server>:18101/?token=<token>` (or open `http://<server>:18101` and paste the token). The token is saved in that browser and removed from the address bar.
+
+| | |
+| --- | --- |
+| **Management port** | `127.0.0.1:18101` by default; `--listen` / `PORTICO_ADMIN_LISTEN` to change it. The relay always stays on loopback. |
+| **Authentication** | Requests from another host need `Authorization: Bearer <token>`. Requests from the same machine (loopback address *and* loopback `Host`) are exempt, so an SSH tunnel such as `ssh -L 18101:127.0.0.1:18101 server` works without a token. Cross-site browser requests are always rejected. |
+| **Token** | Generated on first start in `~/.portico/admin_token` (`0600`). `portico-server token reset` rotates it; the running server picks up the new token immediately. |
+| **TLS** | `--tls-cert` / `--tls-key` (or `PORTICO_ADMIN_TLS_CERT` / `PORTICO_ADMIN_TLS_KEY`). Without TLS the token travels in plain text — use HTTPS or a tunnel when exposing the port. |
+| **Reverse proxy** | Keep `--listen` on loopback and set `--always-require-token` (`PORTICO_ADMIN_ALWAYS_TOKEN=1`). A proxy on the same host would otherwise look like a local client. |
+
+To keep it running, install the bundled systemd **user** unit:
+
+```sh
+sudo install -m 0755 portico-server /usr/local/bin/
+mkdir -p ~/.config/systemd/user && cp portico-server.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now portico-server
+loginctl enable-linger "$USER"   # keep running after you log out
+```
+
+Override the listen address or TLS settings with `systemctl --user edit portico-server` (see the comments in the unit file).
 
 ## How it works
 
@@ -135,6 +171,8 @@ flowchart LR
     MCP --> U1["stdio MCP servers"]
     MCP --> U2["HTTP MCP servers"]
 ```
+
+Portico runs as two processes. **`portico-server`** owns everything that matters — the relay, CLI config patching, the MCP gateway, the databases — and serves the management API and web UI on `127.0.0.1:18101`. **The desktop app** is only a window, tray icon and dock entry: on launch it reuses a running backend or starts the bundled one, then loads the web UI in its window. Browsers on other machines use the same UI.
 
 Each request goes through five steps:
 
@@ -177,12 +215,15 @@ Everything lives in `~/.portico/` on your machine:
 | `session.db` | Session → provider bindings |
 | `hotkeys.db` | Hotkey settings |
 | `platformproxy/<platform>.json` | Previous values of managed CLI config fields (`0600`) |
+| `admin_token` | Access token for remote management (`0600`) |
+| `server.json` | Address, PID and version of the running backend (removed on exit) |
 | `app.log` | Rotating application log (10 MB, 5 backups, 14 days) |
 | `sync-backups/` | Local snapshots taken before a cloud restore |
 
 - **API keys are stored in plaintext** in the local SQLite database, and the UI displays them so you can copy and edit them. Protect your user account accordingly.
 - **No telemetry.** Portico has no analytics, update pinging or hard-coded service endpoints. Network traffic goes only to the providers, MCP upstreams and WebDAV server you configure.
 - **No request contents.** Only structured metrics are logged — never prompts, completions or raw SSE events. Costs are estimates in USD from the bundled pricing table, not your provider's invoice.
+- **The management port listens on loopback by default.** Exposing it is opt-in and requires the access token from other hosts.
 - **WebDAV sync is optional** and off until you configure it. Snapshots are encrypted on your machine with your passphrase before upload.
 
 Report vulnerabilities privately — see [SECURITY.md](SECURITY.md).
@@ -196,9 +237,21 @@ Its config no longer carries the `portico` placeholder — usually because anoth
 </details>
 
 <details>
-<summary><strong>The app exits right after starting</strong></summary>
+<summary><strong>The window says it cannot connect to the Portico service</strong></summary>
 
-The relay needs `127.0.0.1:18100`, and the port is fixed. Check whether another Portico instance or a different relay is holding it, then check `~/.portico/app.log`.
+The backend needs `127.0.0.1:18100` (relay, fixed) and `127.0.0.1:18101` (management). Check whether a different relay or another program is holding them, then check `~/.portico/app.log` and use *Reconnect service* in the tray menu. On Windows and macOS, make sure `portico-server` sits next to the Portico executable.
+</details>
+
+<details>
+<summary><strong>The CLIs still work after I quit Portico</strong></summary>
+
+That is expected: the relay runs in the background service. Choose *Quit and stop service* in the tray menu, or run `curl -X POST -H 'Content-Type: application/json' http://127.0.0.1:18101/api/shutdown`.
+</details>
+
+<details>
+<summary><strong>The web UI keeps asking for a token</strong></summary>
+
+The token was rotated or mistyped. Run `portico-server token show` on the server and use the printed link. Behind a reverse proxy, every request needs the token, including your own.
 </details>
 
 <details>
@@ -245,23 +298,28 @@ Costs are derived from the bundled LiteLLM price table and may differ from your 
 git clone https://github.com/blueshark0/Portico.git
 cd Portico
 
-wails3 task dev       # desktop app with hot reload
-wails3 task build     # build for the current platform
-wails3 task package   # production packaging (.app / NSIS / AppImage + deb + rpm)
+wails3 task build:server   # backend + embedded web UI → bin/portico-server (pure Go, no cgo)
+wails3 task run:server     # build and run it in the foreground
+wails3 task dev            # desktop shell; it starts bin/portico-server as its backend
+wails3 task build          # desktop app + backend for the current platform
+wails3 task package        # production packaging (.app / NSIS / AppImage + deb + rpm)
 ```
 
-Frontend dependencies and Wails bindings are generated by the build tasks. To regenerate bindings by hand after changing Go structs or methods exposed to the UI:
+Frontend dependencies and bindings are generated by the build tasks. The frontend calls the backend through Wails-generated TypeScript bindings, but the calls go over HTTP to `POST /api/rpc/{Facade}.{Method}` on `portico-server`, not through Wails IPC. To regenerate bindings by hand after changing Go structs or facade methods:
 
 ```sh
 wails3 task common:generate:bindings
 ```
 
-**Browser-only frontend preview** — no Go backend needed; the UI detects the missing Wails runtime and serves demo data through a mock transport:
+New facades must be registered in both `internal/app/bootstrap/container.go` (`Facades()`) and `cmd/bindgen` (which exists only for binding generation).
+
+**Frontend development** — Vite proxies `/api` to a running backend (`PORTICO_ADMIN_URL`, default `http://127.0.0.1:18101`). With no backend running, or with `VITE_PORTICO_MOCK=1`, the UI serves demo data through a mock transport:
 
 ```sh
+wails3 task run:server     # optional: real data
 cd frontend
 pnpm install
-pnpm dev              # http://localhost:9245
+pnpm dev                   # http://localhost:9245
 ```
 
 ### Checks
@@ -295,17 +353,21 @@ env ARCH=amd64 wails3 task windows:build
 env ARCH=amd64 wails3 task windows:package   # requires makensis
 ```
 
-Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds macOS (arm64, amd64) and Windows (amd64) artifacts and publishes a release. `scripts/publish_release.sh <tag> [notes-file]` is the equivalent local entry point.
+Pushing a `v*` tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds macOS (arm64, amd64) and Windows (amd64) desktop artifacts, Linux (amd64, arm64) server archives, and publishes a release. `scripts/publish_release.sh <tag> [notes-file]` is the equivalent local entry point.
 
 ## Project structure
 
 ```
-main.go                              Wails entry point; delegates to the container
+main.go                              desktop shell entry point (window, tray, dock)
+cmd/portico-server/                  backend entry point: relay, management API, web UI
+cmd/bindgen/                         registers facades for TS binding generation only
 internal/
   app/bootstrap/                     composition root, storage init and migrations
   app/desktop/                       window, tray and dock shell
+  app/sidecar/                       desktop ↔ backend: discover, spawn, stop portico-server
   interfaces/http/relay/             loopback relay: auth, routing, forwarding, MCP mount
-  interfaces/wails/                  facades exposed to the frontend
+  interfaces/http/admin/             management API: token auth, facade RPC, static web UI
+  interfaces/wails/                  facades exposed to the UI (served over the admin RPC)
   routing/                           providers, route profiles, model mapping schemes, probes
   sessions/                          session → provider stickiness (LRU + SQLite)
   observability/                     request logs, token parsing, stats, app log reader
@@ -313,13 +375,13 @@ internal/
   mcpgateway/                        upstream pool, tool registry, aggregation
   configsync/                        encrypted WebDAV config sync
   hotkeys/                           hotkey storage
-  shared/                            kernel types, storage, logging, background worker
+  shared/                            kernel types, storage, logging, server info, background worker
 resources/model-pricing/             bundled pricing table and cost calculation
 frontend/                            Vue 3 + TypeScript + Vite + Tailwind UI
 build/                               per-platform packaging configuration
 ```
 
-The backend is organized into bounded contexts under `internal/`, each split into `domain / application / infrastructure`, with dependencies pointing inward (`interfaces → application → domain`). New services are wired in `internal/app/bootstrap/container.go`. Frontend state lives in feature composables; there is no store framework.
+The backend is organized into bounded contexts under `internal/`, each split into `domain / application / infrastructure`, with dependencies pointing inward (`interfaces → application → domain`). New services are wired in `internal/app/bootstrap/container.go`. Frontend state lives in feature composables; there is no store framework. The desktop shell links none of the backend packages; it only talks to `portico-server` over HTTP.
 
 ## Contributing
 

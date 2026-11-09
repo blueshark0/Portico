@@ -8,7 +8,7 @@
 
 [Claude Code](https://github.com/anthropics/claude-code) · [Codex](https://github.com/openai/codex) · [Gemini CLI](https://github.com/google-gemini/gemini-cli)
 
-[下载](https://github.com/blueshark0/Portico/releases/latest) · [快速开始](#快速开始) · [工作原理](#工作原理) · [MCP 网关](#mcp-网关) · [参与贡献](#参与贡献)
+[下载](https://github.com/blueshark0/Portico/releases/latest) · [快速开始](#快速开始) · [服务器部署](#服务器部署无桌面) · [工作原理](#工作原理) · [MCP 网关](#mcp-网关) · [参与贡献](#参与贡献)
 
 [English](README.md) · **简体中文**
 
@@ -20,13 +20,14 @@
 
 </div>
 
-Portico 是一个跨平台桌面应用，位于你的 AI 编程 CLI 与它们的 API 供应商之间。它在 `127.0.0.1:18100` 启动本地 relay，把各 CLI 指向这个地址，再将请求转发给你选定的供应商，同时提供会话感知的路由、模型重映射、逐请求的用量与成本统计，以及聚合的 MCP 端点。
+Portico 位于你的 AI 编程 CLI 与它们的 API 供应商之间。后台服务 `portico-server` 在 `127.0.0.1:18100` 启动本地 relay，把各 CLI 指向这个地址，再将请求转发给你选定的供应商，同时提供会话感知的路由、模型重映射、逐请求的用量与成本统计，以及聚合的 MCP 端点。你可以在桌面应用里管理它；在没有桌面环境的机器上，用浏览器管理。
 
 - **所有 CLI 共用一个本地地址。** 在应用内或用 <kbd>⌘K</kbd> / <kbd>Ctrl+K</kbd> 面板切换供应商，不必再改 CLI 配置文件。
 - **路由行为可预期。** 每个 CLI 有一个当前供应商，会话始终跟随首次成功服务它的供应商。没有隐藏的重试链，也没有静默降级。
 - **花多少一目了然。** 每个请求的 Token、缓存读写、估算成本、首响应耗时与总耗时都有记录。
 - **透明转发。** 请求与响应（含 SSE 流）逐字节透传，只有 `model` 字段和你自己配置的 body 改写规则会修改报文。
 - **谨慎对待你的配置。** Portico 只修改它管理的字段，保存原值，并在关闭接入时恢复。
+- **桌面与无桌面都能用。** 同一个后端同时为桌面窗口和受令牌保护的 Web 界面提供服务，因此 Portico 也能运行在没有桌面环境的服务器上。
 
 基于 [Wails 3](https://v3.wails.io)（Go）与 Vue 3 + TypeScript 构建。所有数据都保存在本机。
 
@@ -78,8 +79,9 @@ CLI 使用占位 token `portico` 向 relay 鉴权，**不会**写入你的真实
 | macOS · Apple Silicon | `portico-macos-arm64.zip` |
 | macOS · Intel | `portico-macos-amd64.zip` |
 | Windows · x64 安装包 | `Portico-amd64-installer.exe` |
-| Windows · x64 便携版 | `Portico.exe` |
-| Linux | [从源码构建](#从源码构建) |
+| Windows · x64 便携版 | `portico-windows-amd64-portable.zip` |
+| Linux 服务器（无桌面）· x64 / arm64 | `portico-server-linux-amd64.tar.gz` / `portico-server-linux-arm64.tar.gz`，见[服务器部署](#服务器部署无桌面) |
+| Linux 桌面 | [从源码构建](#从源码构建) |
 
 **macOS：** 解压后将 `Portico.app` 移入 `/Applications`。发布构建为 ad-hoc 签名、未经公证，Gatekeeper 可能阻止首次启动：
 
@@ -89,7 +91,7 @@ xattr -cr /Applications/Portico.app
 
 或在「系统设置 → 隐私与安全性」中允许打开一次。
 
-**Windows：** NSIS 安装包会在需要时引导安装 WebView2 运行时；便携版要求系统已安装 WebView2。
+**Windows：** NSIS 安装包会在需要时引导安装 WebView2 运行时；便携版要求系统已安装 WebView2。便携版压缩包中的 `Portico.exe` 与 `portico-server.exe` 必须放在同一目录，桌面应用会从这里启动后端。
 
 **从 Code Switch 升级：** 首次启动时 Portico 会把 `~/.code-switch` 重命名为 `~/.portico`，保留你的供应商档案、请求日志与接入状态（已存在的 `~/.portico` 不会被覆盖）。旧的 `code-switch` 占位 token 仍然兼容，已有接入可继续工作；重新开关一次接入即可完全切换到新占位 token。
 
@@ -103,6 +105,40 @@ xattr -cr /Applications/Portico.app
 此后切换供应商只需在应用内操作，无需再改配置、无需重启。注意：**已有会话会保持原供应商**，切换只影响新会话。若要让进行中的会话换供应商，使用「会话 → 解绑会话」，或在 CLI 中开新会话。
 
 关闭开关即可恢复原值。供应商名称与 API key 保存在本机 `~/.portico/app.db`。
+
+**退出桌面应用不会停止 relay。** 后端是独立进程，关闭窗口或退出应用后 CLI 仍可正常使用。如需一并停止，使用托盘菜单中的「退出并停止服务」。
+
+## 服务器部署（无桌面）
+
+在没有桌面环境的机器上，直接运行后端并用浏览器管理。请以运行 CLI 的同一个用户身份运行：Portico 会修改该用户的 `~/.claude`、`~/.codex` 与 `~/.gemini`。
+
+```sh
+tar -xzf portico-server-linux-amd64.tar.gz
+cd portico-server-linux-amd64
+./portico-server --listen 0.0.0.0:18101   # relay 仍只监听 127.0.0.1:18100
+./portico-server token show               # 显示访问令牌和登录链接
+```
+
+打开 `http://<服务器>:18101/?token=<令牌>`，或打开 `http://<服务器>:18101` 后粘贴令牌。令牌会保存在当前浏览器中，并从地址栏移除。
+
+| | |
+| --- | --- |
+| **管理端口** | 默认 `127.0.0.1:18101`，用 `--listen` / `PORTICO_ADMIN_LISTEN` 修改。relay 始终只监听回环地址。 |
+| **认证** | 来自其他主机的请求必须携带 `Authorization: Bearer <令牌>`。本机请求（回环地址且 `Host` 也是回环主机名）免令牌，因此 `ssh -L 18101:127.0.0.1:18101 server` 这类 SSH 隧道无需令牌即可使用。跨站的浏览器请求一律拒绝。 |
+| **令牌** | 首次启动时生成于 `~/.portico/admin_token`（`0600`）。`portico-server token reset` 可重新生成，运行中的服务立即生效。 |
+| **TLS** | `--tls-cert` / `--tls-key`（或 `PORTICO_ADMIN_TLS_CERT` / `PORTICO_ADMIN_TLS_KEY`）。未启用 TLS 时令牌以明文传输，对外开放端口时请使用 HTTPS 或隧道。 |
+| **反向代理** | 让 `--listen` 保持回环地址，并开启 `--always-require-token`（`PORTICO_ADMIN_ALWAYS_TOKEN=1`）。否则同机的反向代理会被当作本机客户端。 |
+
+如需常驻运行，安装随附的 systemd **用户**服务：
+
+```sh
+sudo install -m 0755 portico-server /usr/local/bin/
+mkdir -p ~/.config/systemd/user && cp portico-server.service ~/.config/systemd/user/
+systemctl --user daemon-reload && systemctl --user enable --now portico-server
+loginctl enable-linger "$USER"   # 注销后保持运行
+```
+
+用 `systemctl --user edit portico-server` 覆盖监听地址或 TLS 设置（见服务文件中的注释）。
 
 ## 工作原理
 
@@ -135,6 +171,8 @@ flowchart LR
     MCP --> U1["stdio MCP server"]
     MCP --> U2["HTTP MCP server"]
 ```
+
+Portico 由两个进程组成。**`portico-server`** 负责所有核心功能：relay、CLI 配置修改、MCP 网关和数据库，并在 `127.0.0.1:18101` 提供管理 API 与 Web 界面。**桌面应用**只是窗口、托盘图标和 Dock 入口：启动时复用已在运行的后端，否则拉起随应用分发的后端，然后在窗口中加载 Web 界面。其他机器上的浏览器使用的也是同一套界面。
 
 每个请求经历五步：
 
@@ -177,12 +215,15 @@ Portico 还能把你的 MCP server 聚合成一个 Streamable HTTP 端点，让�
 | `session.db` | 会话 → 供应商绑定 |
 | `hotkeys.db` | 快捷键设置 |
 | `platformproxy/<platform>.json` | 受管 CLI 配置字段的原值（`0600`） |
+| `admin_token` | 远程管理的访问令牌（`0600`） |
+| `server.json` | 运行中后端的地址、PID 与版本（退出时删除） |
 | `app.log` | 滚动应用日志（10 MB、5 个备份、14 天） |
 | `sync-backups/` | 云端恢复前的本地快照 |
 
 - **API key 以明文存储**在本机 SQLite 中，界面也会明文展示以便复制编辑，请注意本机账户与屏幕安全。
 - **无遥测**：没有统计上报、没有更新探测、没有硬编码的服务端地址。网络请求只发往你配置的供应商、MCP 上游与 WebDAV 服务器。
 - **不记录请求内容**：只保存结构化指标，不保存提示词、补全内容或原始 SSE 事件。成本为内置价格表估算的美元金额，不等于供应商账单。
+- **管理端口默认只监听回环地址。** 对外开放需要你主动配置，且其他主机必须携带访问令牌。
 - **WebDAV 同步可选**，未配置前不会启用；快照在上传前用你的口令在本机加密。
 
 安全问题请私下报告，见 [SECURITY.md](SECURITY.md)。
@@ -196,9 +237,21 @@ Portico 还能把你的 MCP server 聚合成一个 Streamable HTTP 端点，让�
 </details>
 
 <details>
-<summary><strong>应用启动后立即退出</strong></summary>
+<summary><strong>窗口提示无法连接 Portico 服务</strong></summary>
 
-relay 需要占用 `127.0.0.1:18100`，该端口固定不可配置。检查是否有另一个 Portico 实例或其他 relay 占用了端口，并查看 `~/.portico/app.log`。
+后端需要占用 `127.0.0.1:18100`（relay，固定）与 `127.0.0.1:18101`（管理端口）。检查是否有其他 relay 或程序占用了端口，然后查看 `~/.portico/app.log`，并在托盘菜单中选择「重新连接服务」。在 Windows 与 macOS 上，请确认 `portico-server` 与 Portico 可执行文件位于同一目录。
+</details>
+
+<details>
+<summary><strong>退出 Portico 后 CLI 仍然可用</strong></summary>
+
+这是预期行为：relay 运行在后台服务中。在托盘菜单中选择「退出并停止服务」，或运行 `curl -X POST -H 'Content-Type: application/json' http://127.0.0.1:18101/api/shutdown`。
+</details>
+
+<details>
+<summary><strong>Web 界面反复要求输入令牌</strong></summary>
+
+令牌已被重置或输入有误。在服务器上运行 `portico-server token show` 并使用输出的链接。部署在反向代理之后时，所有请求（包括你自己的）都需要令牌。
 </details>
 
 <details>
@@ -245,23 +298,28 @@ relay 需要占用 `127.0.0.1:18100`，该端口固定不可配置。检查是�
 git clone https://github.com/blueshark0/Portico.git
 cd Portico
 
-wails3 task dev       # 桌面应用，热重载
-wails3 task build     # 构建当前平台
-wails3 task package   # 生产打包（.app / NSIS / AppImage + deb + rpm）
+wails3 task build:server   # 后端 + 内嵌 Web 界面 → bin/portico-server（纯 Go，无需 cgo）
+wails3 task run:server     # 构建并在前台运行
+wails3 task dev            # 桌面外壳，会启动 bin/portico-server 作为后端
+wails3 task build          # 构建当前平台的桌面应用与后端
+wails3 task package        # 生产打包（.app / NSIS / AppImage + deb + rpm）
 ```
 
-前端依赖与 Wails bindings 由构建任务自动生成。修改暴露给前端的 Go 结构体或方法后，可手动重新生成：
+前端依赖与 bindings 由构建任务自动生成。前端仍通过 Wails 生成的 TypeScript bindings 调用后端，但调用经 HTTP 发往 `portico-server` 的 `POST /api/rpc/{Facade}.{Method}`，不走 Wails IPC。修改 Go 结构体或 facade 方法后，可手动重新生成：
 
 ```sh
 wails3 task common:generate:bindings
 ```
 
-**纯浏览器预览前端**：无需 Go 后端，UI 检测到没有 Wails 运行时会通过 mock transport 提供演示数据：
+新增 facade 时需同时登记到 `internal/app/bootstrap/container.go` 的 `Facades()` 与 `cmd/bindgen`（仅用于生成 bindings）。
+
+**前端开发**：Vite 会把 `/api` 代理到运行中的后端（`PORTICO_ADMIN_URL`，默认 `http://127.0.0.1:18101`）。后端未运行或设置了 `VITE_PORTICO_MOCK=1` 时，UI 通过 mock transport 提供演示数据：
 
 ```sh
+wails3 task run:server     # 可选：使用真实数据
 cd frontend
 pnpm install
-pnpm dev              # http://localhost:9245
+pnpm dev                   # http://localhost:9245
 ```
 
 ### 检查
@@ -295,17 +353,21 @@ env ARCH=amd64 wails3 task windows:build
 env ARCH=amd64 wails3 task windows:package   # 需要 makensis
 ```
 
-推送 `v*` 标签会触发 [`.github/workflows/release.yml`](.github/workflows/release.yml)，构建 macOS（arm64、amd64）与 Windows（amd64）产物并发布 Release。`scripts/publish_release.sh <tag> [notes-file]` 是等价的本地入口。
+推送 `v*` 标签会触发 [`.github/workflows/release.yml`](.github/workflows/release.yml)，构建 macOS（arm64、amd64）与 Windows（amd64）桌面产物、Linux（amd64、arm64）服务器压缩包，并发布 Release。`scripts/publish_release.sh <tag> [notes-file]` 是等价的本地入口。
 
 ## 项目结构
 
 ```
-main.go                              Wails 入口，委托给 container
+main.go                              桌面外壳入口（窗口、托盘、Dock）
+cmd/portico-server/                  后端入口：relay、管理 API、Web 界面
+cmd/bindgen/                         仅用于生成 TS bindings 的 facade 登记
 internal/
   app/bootstrap/                     组合根、存储初始化与迁移
   app/desktop/                       窗口、托盘与 Dock 外壳
+  app/sidecar/                       桌面 ↔ 后端：发现、拉起、停止 portico-server
   interfaces/http/relay/             回环 relay：鉴权、路由、转发、MCP 挂载
-  interfaces/wails/                  暴露给前端的 facade
+  interfaces/http/admin/             管理 API：令牌认证、facade RPC、静态 Web 界面
+  interfaces/wails/                  暴露给界面的 facade（经管理 API 的 RPC 提供）
   routing/                           供应商、路由档案、模型映射方案、连通性探测
   sessions/                          会话 → 供应商粘性（LRU + SQLite）
   observability/                     请求日志、Token 解析、统计、应用日志读取
@@ -313,13 +375,13 @@ internal/
   mcpgateway/                        上游连接池、工具注册表、聚合
   configsync/                        加密的 WebDAV 配置同步
   hotkeys/                           快捷键存储
-  shared/                            kernel 类型、存储、日志、后台 worker
+  shared/                            kernel 类型、存储、日志、服务信息、后台 worker
 resources/model-pricing/             内置价格表与成本计算
 frontend/                            Vue 3 + TypeScript + Vite + Tailwind UI
 build/                               各平台打包配置
 ```
 
-后端按 `internal/` 下的 bounded context 组织，每个 context 分为 `domain / application / infrastructure`，依赖方向向内（`interfaces → application → domain`）。新服务在 `internal/app/bootstrap/container.go` 中装配。前端状态由各功能 composable 管理，不使用状态管理框架。
+后端按 `internal/` 下的 bounded context 组织，每个 context 分为 `domain / application / infrastructure`，依赖方向向内（`interfaces → application → domain`）。新服务在 `internal/app/bootstrap/container.go` 中装配。前端状态由各功能 composable 管理，不使用状态管理框架。桌面外壳不链接任何后端包，只通过 HTTP 与 `portico-server` 通信。
 
 ## 参与贡献
 
