@@ -9,12 +9,15 @@ permissions:
   contents: write
 
 jobs:
-  build-macos:
-    name: Build macOS
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        arch: [arm64, amd64]
+  build-linux:
+    name: Build Linux (x86_64)
+    runs-on: ubuntu-24.04
+    env:
+      ARCH: amd64
+      # nfpm.yaml 通过环境变量读取架构和维护者
+      GOARCH: amd64
+      GIT_COMMITTER_NAME: blueshark0
+      GIT_COMMITTER_EMAIL: blueshark0@users.noreply.github.com
     steps:
       - uses: actions/checkout@v4
 
@@ -22,125 +25,181 @@ jobs:
         with:
           go-version: '1.26.10'
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
 
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 8
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
 
-      - name: Install frontend dependencies
-        run: cd frontend && pnpm install
-
-      - name: Update build assets
-        run: wails3 task common:update:build-assets
-
-      - name: Generate bindings
-        run: wails3 task common:generate:bindings
-
-      - name: Build macOS ${{ matrix.arch }}
-        run: env ARCH=${{ matrix.arch }} wails3 task package
-
-      - name: Find app bundle
-        id: find-app
+      # nfpm.yaml 里的版本号是固定值，打包前改成当前 tag，否则 deb/rpm 无法正常升级
+      - name: Set package version
         run: |
-          if [ -d "bin/portico.app" ]; then
-            echo "app_path=bin/portico.app" >> $GITHUB_OUTPUT
-          elif [ -d "bin/Portico.app" ]; then
-            echo "app_path=bin/Portico.app" >> $GITHUB_OUTPUT
-          else
-            echo "App bundle not found" >&2
-            exit 1
-          fi
+          sed -i "s/^version: .*/version: \"${GITHUB_REF_NAME#v}\"/" build/linux/nfpm/nfpm.yaml
 
-      - name: Archive macOS app
+      - name: Build Linux packages
+        run: wails3 task package
+
+      - name: Rename packages
         run: |
           cd bin
-          ditto -c -k --sequesterRsrc --keepParent "$(basename ${{ steps.find-app.outputs.app_path }})" portico-macos-${{ matrix.arch }}.zip
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-${{ matrix.arch }}
-          path: bin/portico-macos-${{ matrix.arch }}.zip
-
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26.10'
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - uses: pnpm/action-setup@v3
-        with:
-          version: 8
-
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
-
-      - name: Install frontend dependencies
-        run: cd frontend && pnpm install
-
-      - name: Install NSIS
-        run: choco install nsis -y
-
-      - name: Update build assets
-        run: wails3 task common:update:build-assets
-
-      - name: Generate bindings
-        run: wails3 task common:generate:bindings
-
-      - name: Build Windows Binary
-        run: |
-          $env:ARCH = "amd64"
-          wails3 task windows:build
-        env:
-          PRODUCTION: "true"
-
-      - name: Verify Binary
-        run: |
-          if (Test-Path "bin\Portico.exe") {
-            Write-Host "✓ Binary found: bin\Portico.exe"
-            Get-Item "bin\Portico.exe" | Format-List Name,Length,LastWriteTime
-          } else {
-            Write-Host "✗ Binary not found!"
-            Write-Host "Listing bin directory:"
-            Get-ChildItem bin -ErrorAction SilentlyContinue
-            exit 1
-          }
-
-      - name: Create NSIS Installer
-        run: |
-          $env:PATH += ";C:\Program Files (x86)\NSIS"
-          Push-Location build\windows\nsis
-          wails3 generate webview2bootstrapper
-          $binaryPath = (Resolve-Path "..\..\..\bin\Portico.exe").Path
-          Write-Host "Binary path: $binaryPath"
-          makensis -DARG_WAILS_AMD64_BINARY="$binaryPath" project.nsi
-          Pop-Location
+          mv ./*.AppImage portico-linux-amd64.AppImage
+          mv Portico.deb portico-linux-amd64.deb
+          mv Portico.rpm portico-linux-amd64.rpm
+          mv Portico.pkg.tar.zst portico-linux-amd64.pkg.tar.zst
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-amd64
-          path: |
-            bin/Portico-amd64-installer.exe
-            bin/Portico.exe
+          name: linux-amd64
+          path: bin/portico-linux-amd64.*
 
+  # 当前发布优先 x86_64 Linux，macOS 和 Windows 暂时停用。恢复时取消下面两个 job 的注释，
+  # 并同步恢复 create-release 里的 needs、资产复制和安装说明。
+#   build-macos:
+#     name: Build macOS
+#     runs-on: macos-latest
+#     strategy:
+#       matrix:
+#         arch: [arm64, amd64]
+#     steps:
+#       - uses: actions/checkout@v4
+#
+#       - uses: actions/setup-go@v5
+#         with:
+#           go-version: '1.26.10'
+#
+#       - uses: actions/setup-node@v4
+#         with:
+#           node-version: '22'
+#
+#       - uses: pnpm/action-setup@v3
+#         with:
+#           version: 8
+#
+#       - name: Install Wails
+#         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
+#
+#       - name: Install frontend dependencies
+#         run: cd frontend && pnpm install
+#
+#       - name: Update build assets
+#         run: wails3 task common:update:build-assets
+#
+#       - name: Generate bindings
+#         run: wails3 task common:generate:bindings
+#
+#       - name: Build macOS ${{ matrix.arch }}
+#         run: env ARCH=${{ matrix.arch }} wails3 task package
+#
+#       - name: Find app bundle
+#         id: find-app
+#         run: |
+#           if [ -d "bin/portico.app" ]; then
+#             echo "app_path=bin/portico.app" >> $GITHUB_OUTPUT
+#           elif [ -d "bin/Portico.app" ]; then
+#             echo "app_path=bin/Portico.app" >> $GITHUB_OUTPUT
+#           else
+#             echo "App bundle not found" >&2
+#             exit 1
+#           fi
+#
+#       - name: Archive macOS app
+#         run: |
+#           cd bin
+#           ditto -c -k --sequesterRsrc --keepParent "$(basename ${{ steps.find-app.outputs.app_path }})" portico-macos-${{ matrix.arch }}.zip
+#
+#       - name: Upload artifact
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: macos-${{ matrix.arch }}
+#           path: bin/portico-macos-${{ matrix.arch }}.zip
+#
+#   build-windows:
+#     name: Build Windows
+#     runs-on: windows-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#
+#       - uses: actions/setup-go@v5
+#         with:
+#           go-version: '1.26.10'
+#
+#       - uses: actions/setup-node@v4
+#         with:
+#           node-version: '22'
+#
+#       - uses: pnpm/action-setup@v3
+#         with:
+#           version: 8
+#
+#       - name: Install Wails
+#         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
+#
+#       - name: Install frontend dependencies
+#         run: cd frontend && pnpm install
+#
+#       - name: Install NSIS
+#         run: choco install nsis -y
+#
+#       - name: Update build assets
+#         run: wails3 task common:update:build-assets
+#
+#       - name: Generate bindings
+#         run: wails3 task common:generate:bindings
+#
+#       - name: Build Windows Binary
+#         run: |
+#           $env:ARCH = "amd64"
+#           wails3 task windows:build
+#         env:
+#           PRODUCTION: "true"
+#
+#       - name: Verify Binary
+#         run: |
+#           if (Test-Path "bin\Portico.exe") {
+#             Write-Host "✓ Binary found: bin\Portico.exe"
+#             Get-Item "bin\Portico.exe" | Format-List Name,Length,LastWriteTime
+#           } else {
+#             Write-Host "✗ Binary not found!"
+#             Write-Host "Listing bin directory:"
+#             Get-ChildItem bin -ErrorAction SilentlyContinue
+#             exit 1
+#           }
+#
+#       - name: Create NSIS Installer
+#         run: |
+#           $env:PATH += ";C:\Program Files (x86)\NSIS"
+#           Push-Location build\windows\nsis
+#           wails3 generate webview2bootstrapper
+#           $binaryPath = (Resolve-Path "..\..\..\bin\Portico.exe").Path
+#           Write-Host "Binary path: $binaryPath"
+#           makensis -DARG_WAILS_AMD64_BINARY="$binaryPath" project.nsi
+#           Pop-Location
+#
+#       - name: Upload artifacts
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: windows-amd64
+#           path: |
+#             bin/Portico-amd64-installer.exe
+#             bin/Portico.exe
+#
   create-release:
     name: Create Release
-    needs: [build-macos, build-windows]
+    # needs: [build-linux, build-macos, build-windows]
+    needs: [build-linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -156,10 +215,11 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
-          cp artifacts/macos-arm64/portico-macos-arm64.zip release-assets/
-          cp artifacts/macos-amd64/portico-macos-amd64.zip release-assets/
-          cp artifacts/windows-amd64/Portico-amd64-installer.exe release-assets/
-          cp artifacts/windows-amd64/Portico.exe release-assets/
+          cp artifacts/linux-amd64/portico-linux-amd64.* release-assets/
+          # cp artifacts/macos-arm64/portico-macos-arm64.zip release-assets/
+          # cp artifacts/macos-amd64/portico-macos-amd64.zip release-assets/
+          # cp artifacts/windows-amd64/Portico-amd64-installer.exe release-assets/
+          # cp artifacts/windows-amd64/Portico.exe release-assets/
           ls -lh release-assets/
 
       - name: Create Release
@@ -188,9 +248,16 @@ jobs:
 
             ## 安装说明
 
-            - **Windows**：下载 `portico-amd64-installer.exe` 运行安装，或下载 `portico.exe` 直接运行
-            - **macOS (Apple Silicon)**：下载 `portico-macos-arm64.zip`
-            - **macOS (Intel)**：下载 `portico-macos-amd64.zip`
+            以下均为 x86_64 Linux 构建，需要 GTK 4 和 WebKitGTK 6.0：
+
+            - **Debian / Ubuntu**：下载 `portico-linux-amd64.deb`
+            - **Fedora / RHEL**：下载 `portico-linux-amd64.rpm`
+            - **Arch Linux**：下载 `portico-linux-amd64.pkg.tar.zst`
+            - **其他发行版**：下载 `portico-linux-amd64.AppImage`
+          # 恢复其他平台时，把下面几行移回上面的 body：
+          # - **Windows**：下载 `Portico-amd64-installer.exe` 运行安装，或下载 `Portico.exe` 直接运行
+          # - **macOS (Apple Silicon)**：下载 `portico-macos-arm64.zip`
+          # - **macOS (Intel)**：下载 `portico-macos-amd64.zip`
           draft: false
           prerelease: false
         env:
