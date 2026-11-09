@@ -12,8 +12,8 @@ priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
 description: "Manage Claude & Codex relays, providers, and request logs."
 vendor: "Portico"
-homepage: "https://wails.io"
-license: "MIT"
+homepage: "https://github.com/blueshark0/Portico"
+license: "Apache-2.0"
 release: "1"
 
 contents:
@@ -26,14 +26,14 @@ contents:
 
 # Default dependencies for Debian/Ubuntu with GTK4 and WebKitGTK 6.0
 depends:
-  - libgtk-4-1
-  - libwebkitgtk-6.0-0
+  - libgtk-4-1 (>= 4.14)
+  - libwebkitgtk-6.0-4
 
 # Distribution-specific overrides for GTK4 and WebKitGTK 6.0
 overrides:
   rpm:
     depends:
-      - gtk4
+      - gtk4 >= 4.14
       - webkitgtk6.0
 
   archlinux:

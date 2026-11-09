@@ -87,27 +87,6 @@ func TestClaudeInjectPreservesOtherContent(t *testing.T) {
 	}
 }
 
-func TestClaudeInjectReplacesLegacyEntry(t *testing.T) {
-	m := newClaudeManager(t)
-	seed := `{"mcpServers":{"code-switch":{"type":"http","url":"http://127.0.0.1:18100/mcp"},"user-own":{"type":"stdio","command":"x"}}}`
-	if err := os.WriteFile(claudeConfigPath(t), []byte(seed), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := m.InjectMcp(); err != nil {
-		t.Fatal(err)
-	}
-	servers := readClaudeConfig(t)["mcpServers"].(map[string]any)
-	if _, ok := servers[legacyMcpEntryName]; ok {
-		t.Fatal("旧 MCP 条目应被移除")
-	}
-	if _, ok := servers[mcpEntryName]; !ok {
-		t.Fatal("新 MCP 条目应被注入")
-	}
-	if _, ok := servers["user-own"]; !ok {
-		t.Fatal("用户条目应保留")
-	}
-}
-
 func TestClaudeInjectIdempotentSkipsWrite(t *testing.T) {
 	m := newClaudeManager(t)
 	if err := m.InjectMcp(); err != nil {

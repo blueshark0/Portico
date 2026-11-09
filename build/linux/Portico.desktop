@@ -2,7 +2,7 @@
 Type=Application
 Name=Portico
 Exec=Portico
-Icon=appicon
+Icon=Portico
 Categories=Development;
 Terminal=false
 Keywords=wails

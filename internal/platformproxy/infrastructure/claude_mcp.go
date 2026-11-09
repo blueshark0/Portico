@@ -11,10 +11,7 @@ import (
 
 // mcpEntryName 注入到各 CLI 配置中的 MCP 条目名，CLI 内工具显示为
 // mcp__portico__<工具名>。
-const (
-	mcpEntryName       = "portico"
-	legacyMcpEntryName = "code-switch"
-)
+const mcpEntryName = "portico"
 
 // claudeConfigFileName 是 Claude Code 的用户级配置文件（home 根下，
 // 注意不是 ~/.claude/ 目录），顶层 mcpServers 即 user scope，全项目生效
@@ -89,11 +86,9 @@ func (m *ClaudeManager) InjectMcp() error {
 		servers = make(map[string]any)
 	}
 	payload := m.mcpEntryPayload()
-	_, hasLegacy := servers[legacyMcpEntryName]
-	if reflect.DeepEqual(servers[mcpEntryName], payload) && !hasLegacy {
+	if reflect.DeepEqual(servers[mcpEntryName], payload) {
 		return nil // 幂等：内容一致不写盘，缩小并发写冲突窗口
 	}
-	delete(servers, legacyMcpEntryName)
 	servers[mcpEntryName] = payload
 	raw["mcpServers"] = servers
 	return writeJSONMapFile(path, raw)
@@ -115,13 +110,10 @@ func (m *ClaudeManager) RemoveMcp() error {
 		return err
 	}
 	servers, _ := raw["mcpServers"].(map[string]any)
-	_, hasCurrent := servers[mcpEntryName]
-	_, hasLegacy := servers[legacyMcpEntryName]
-	if !hasCurrent && !hasLegacy {
+	if _, ok := servers[mcpEntryName]; !ok {
 		return nil
 	}
 	delete(servers, mcpEntryName)
-	delete(servers, legacyMcpEntryName)
 	if len(servers) == 0 {
 		delete(raw, "mcpServers")
 	} else {

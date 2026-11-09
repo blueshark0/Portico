@@ -80,7 +80,7 @@ CLI 使用占位 token `portico` 向 relay 鉴权，**不会**写入你的真实
 | Arch Linux · x86_64 | `portico-linux-amd64.pkg.tar.zst` |
 | 其他 Linux · x86_64 | `portico-linux-amd64.AppImage` |
 
-当前只发布 x86_64 Linux 版本，其他平台可[从源码构建](#从源码构建)。安装包依赖 GTK 4 和 WebKitGTK 6.0。
+当前只发布 x86_64 Linux 版本，其他平台可[从源码构建](#从源码构建)。安装包需要 GTK 4.14 或更新版本和 WebKitGTK 6.0，例如 Ubuntu 24.04 或 Debian 13。
 
 <!-- macOS 和 Windows 的发布暂时停用。恢复 release.yml 时一并恢复以下表格行和说明。
 | macOS · Apple Silicon | `portico-macos-arm64.zip` |
@@ -98,8 +98,6 @@ xattr -cr /Applications/Portico.app
 
 **Windows：** NSIS 安装包会在需要时引导安装 WebView2 运行时；便携版要求系统已安装 WebView2。
 -->
-
-**从 Code Switch 升级：** 首次启动时 Portico 会把 `~/.code-switch` 重命名为 `~/.portico`，保留你的供应商档案、请求日志与接入状态（已存在的 `~/.portico` 不会被覆盖）。旧的 `code-switch` 占位 token 仍然兼容，已有接入可继续工作；重新开关一次接入即可完全切换到新占位 token。
 
 ## 快速开始
 
