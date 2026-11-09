@@ -8,7 +8,7 @@ Portico is a Wails 3 desktop app (Go backend + Vue 3/TypeScript frontend) that r
 
 ## Commands
 
-Prerequisites: Go 1.26+, Node 20.19+/22.12+ with pnpm 9, Wails CLI `go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0`. On Linux: `libgtk-4-dev libwebkitgtk-6.0-dev`.
+Prerequisites: Go 1.26+, Node 20.19+/22.12+ with pnpm 9, Wails CLI `go install -tags gtk3 github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0`. On Linux: `libgtk-3-dev libwebkit2gtk-4.1-dev`.
 
 ```sh
 wails3 task dev                         # desktop app with hot reload (Vite on port 9245, override via WAILS_VITE_PORT)
@@ -20,21 +20,22 @@ wails3 task common:generate:bindings    # regenerate frontend/bindings after cha
 CI checks (run these before a PR):
 
 ```sh
-go vet ./...
-go test -race -count=1 ./...
+go vet -tags gtk3 ./...
+go test -tags gtk3 -race -count=1 ./...
 cd frontend && pnpm install --frozen-lockfile && pnpm run build   # vue-tsc type-check + Vite build
 ```
 
 Single package / single test:
 
 ```sh
-go test -race -count=1 ./internal/interfaces/http/relay/ -run TestName
+go test -tags gtk3 -race -count=1 ./internal/interfaces/http/relay/ -run TestName
 ```
 
 Build gotchas:
 - `main.go` embeds `frontend/dist` via `//go:embed all:frontend/dist`, so `go vet`/`go test ./...` fail to compile the root package until the frontend has been built at least once.
 - `frontend/bindings/` is generated and gitignored; the frontend won't type-check until bindings are generated (needs the Go side to compile).
 - Browser-only UI preview without the Go backend: `cd frontend && pnpm dev`. `main.ts` probes `/wails/runtime`, and if it's missing installs `src/mocks/installMockTransport.ts`, which answers binding calls by methodID with data from `src/mocks/demoData.ts`. New binding methods return `null` there until a mock handler is added.
+- Linux builds use Wails' GTK3 backend (`-tags gtk3`, set in `build/linux/Taskfile.yml`) because the minimum supported system is Ubuntu 22.04, whose GTK4 is too old. Without the tag, Go commands that compile the root package look for GTK4.
 - An optional `.env.local` (see `.env.local.example`) is loaded by Taskfile for local build proxies.
 
 ## Architecture

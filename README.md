@@ -80,7 +80,7 @@ Grab a build from [**Releases**](https://github.com/blueshark0/Portico/releases/
 | Arch Linux · x86_64 | `portico-linux-amd64.pkg.tar.zst` |
 | Other Linux · x86_64 | `portico-linux-amd64.AppImage` |
 
-Releases currently target x86_64 Linux only. Other platforms can [build from source](#building-from-source). The packages need GTK 4.14 or newer and WebKitGTK 6.0, for example Ubuntu 24.04 or Debian 13.
+Releases currently target x86_64 Linux only. Other platforms can [build from source](#building-from-source). The minimum supported system is Ubuntu 22.04. The packages need GTK 3 and WebKit2GTK 4.1.
 
 <!-- macOS and Windows releases are paused. Restore these rows and notes together with release.yml.
 | macOS · Apple Silicon | `portico-macos-arm64.zip` |
@@ -236,13 +236,13 @@ Costs are derived from the bundled LiteLLM price table and may differ from your 
 - **Wails 3.1.0 CLI**
 
   ```sh
-  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
+  go install -tags gtk3 github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
   ```
 
-- **Linux only:** `libgtk-4-dev` and `libwebkitgtk-6.0-dev`
+- **Linux only:** `libgtk-3-dev` and `libwebkit2gtk-4.1-dev`
 
   ```sh
-  sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+  sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
   ```
 
 ### Building from source
