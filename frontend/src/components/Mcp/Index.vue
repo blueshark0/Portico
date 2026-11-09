@@ -45,24 +45,43 @@ const selectedId = ref<number | null>(null)
 const menuFor = ref(0)
 const testingId = ref(0)
 
+// 工具清单只随各上游的 toolsRevision 变化；签名不变时无需重拉。
+const toolsSignature = () =>
+  Object.values(statuses.value)
+    .map((st) => `${st.serverId}:${st.toolsRevision}`)
+    .sort()
+    .join(',')
+
+let loadedToolsSignature: string | null = null
+
 const refreshTools = async () => {
+  const signature = toolsSignature()
   const list = await runWithToast(() => fetchMcpTools(), {
     fallback: t('mcpPage.messages.toolsLoadFailed'),
     silent: true,
   })
-  tools.value = list ?? []
+  if (list) {
+    tools.value = list
+    loadedToolsSignature = signature
+  } else {
+    tools.value = []
+    loadedToolsSignature = null // 失败时下一轮重试
+  }
 }
 
 let pollTimer: number | undefined
 let runtimeRefreshing = false
 
-// 启用上游后连接是异步完成的；持续刷新内存快照，避免状态停留在“连接中”。
+// 启用上游后连接是异步完成的；每秒刷新连接状态，避免停留在“连接中”。
+// 完整工具清单（含 InputSchema）只在 toolsRevision 变化后才重新拉取。
 const refreshRuntime = async () => {
   if (runtimeRefreshing || document.hidden) return
   runtimeRefreshing = true
   try {
     await refreshStatuses()
-    await refreshTools()
+    if (toolsSignature() !== loadedToolsSignature) {
+      await refreshTools()
+    }
   } finally {
     runtimeRefreshing = false
   }

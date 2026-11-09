@@ -3,6 +3,8 @@ package infrastructure
 import (
 	"database/sql"
 	"time"
+
+	"portico/internal/shared/storage"
 )
 
 const timeLayout = "2006-01-02 15:04:05"
@@ -29,4 +31,13 @@ func nullInt64(v sql.NullInt64) int64 {
 		return v.Int64
 	}
 	return 0
+}
+
+// requestLogReadDB 返回 request_log 的查询连接池。只读池未注册时（测试、
+// 内存库等单连接场景）回退到写入池，行为与旧实现一致。
+func requestLogReadDB() (*sql.DB, error) {
+	if db, err := storage.DB(storage.RequestLogReadDBName); err == nil {
+		return db, nil
+	}
+	return storage.DB(storage.RequestLogDBName)
 }

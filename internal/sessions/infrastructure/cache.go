@@ -17,12 +17,23 @@ const (
 	sessionPersistInterval = 60 * time.Second
 )
 
+// sessionVisibility 是已经写入数据库的会话可见性（session_provider_binding.hidden）。
+// 新绑定的条目总是 unknown；可见（主会话）是终态，后台会话只能被提升为可见。
+type sessionVisibility uint8
+
+const (
+	sessionVisibilityUnknown sessionVisibility = iota
+	sessionVisibilityVisible
+	sessionVisibilityBackground
+)
+
 type sessionCacheEntry struct {
 	providerName     string
 	lastSuccessAt    time.Time
 	lastPersistedAt  time.Time
 	pendingPersistAt time.Time
 	generation       uint64
+	visibility       sessionVisibility
 }
 
 // Cache 的 entry 会被 gin 请求 goroutine、sessionUpdateWorker 后台 goroutine
@@ -110,6 +121,7 @@ func (sc *Cache) cachedProviderLocked(platform, sessionID string) (string, uint6
 			entry.lastSuccessAt = time.Time{}
 			entry.lastPersistedAt = time.Time{}
 			entry.pendingPersistAt = time.Time{}
+			entry.visibility = sessionVisibilityUnknown
 			return "", entry.generation, false
 		}
 	}
@@ -247,6 +259,66 @@ func (sc *Cache) RecordSessionSuccessGeneration(platform, sessionID, providerNam
 	return true, true
 }
 
+// RecordSessionBackground 记录会话可见性，并跳过不会改变数据库的写入：
+// 已确认的主会话不会再被隐藏，后台会话再次收到后台请求也不变。旧实现在
+// 每次 Codex 请求成功后都同步执行一次 UPDATE。
+//
+// 已知可见性挂在缓存条目上，与绑定同生共死：新绑定（数据库行以未分类插入）
+// 会创建新条目，解绑/失效会推进 generation，LRU 淘汰后重新加载的条目为
+// unknown，这些情况都会重新写一次库。
+func (sc *Cache) RecordSessionBackground(platform, sessionID string, background bool, generation uint64) error {
+	if sessionID == "" {
+		return nil
+	}
+	sc.mu.Lock()
+	known, current := sc.visibilityLocked(platform, sessionID, generation)
+	sc.mu.Unlock()
+	if !current {
+		return nil
+	}
+	if known == sessionVisibilityVisible || (background && known == sessionVisibilityBackground) {
+		return nil
+	}
+	if sc.service == nil {
+		return nil
+	}
+	if err := sc.service.RecordSessionBackground(platform, sessionID, background); err != nil {
+		return err
+	}
+
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	if sc.cache == nil || !sc.isCurrentGenerationLocked(platform, sessionID, generation) {
+		return nil
+	}
+	entry, ok := sc.cache.Get(sc.cacheKey(platform, sessionID))
+	if !ok || entry == nil || entry.providerName == "" {
+		return nil
+	}
+	if !background {
+		entry.visibility = sessionVisibilityVisible
+	} else if entry.visibility != sessionVisibilityVisible {
+		entry.visibility = sessionVisibilityBackground
+	}
+	return nil
+}
+
+// visibilityLocked 返回已知可见性以及 generation 是否仍然有效。条目缺失或
+// 已过期时可见性为 unknown（需要写库）。
+func (sc *Cache) visibilityLocked(platform, sessionID string, generation uint64) (sessionVisibility, bool) {
+	if !sc.isCurrentGenerationLocked(platform, sessionID, generation) {
+		return sessionVisibilityUnknown, false
+	}
+	if sc.cache == nil {
+		return sessionVisibilityUnknown, true
+	}
+	entry, ok := sc.cache.Get(sc.cacheKey(platform, sessionID))
+	if !ok || entry == nil || entry.providerName == "" || sc.isExpired(platform, entry.lastSuccessAt) {
+		return sessionVisibilityUnknown, true
+	}
+	return entry.visibility, true
+}
+
 func (sc *Cache) InvalidateSession(platform, sessionID string) {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
@@ -264,6 +336,7 @@ func (sc *Cache) InvalidateSession(platform, sessionID string) {
 	entry.lastSuccessAt = time.Time{}
 	entry.lastPersistedAt = time.Time{}
 	entry.pendingPersistAt = time.Time{}
+	entry.visibility = sessionVisibilityUnknown
 }
 
 func (sc *Cache) isExpired(platform string, lastSuccessAt time.Time) bool {

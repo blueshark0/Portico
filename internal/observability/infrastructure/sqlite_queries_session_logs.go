@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	observabilitydomain "portico/internal/observability/domain"
-	"portico/internal/shared/storage"
 )
 
 // ListSessionRequestLogs 返回本地保留期内一个会话的全部结构化请求记录，
@@ -15,7 +14,7 @@ func (q *SQLiteQueries) ListSessionRequestLogs(platform string, sessionID string
 	if platform == "" || sessionID == "" {
 		return []observabilitydomain.RequestLog{}, nil
 	}
-	db, err := storage.DB(storage.RequestLogDBName)
+	db, err := requestLogReadDB()
 	if err != nil {
 		return nil, err
 	}

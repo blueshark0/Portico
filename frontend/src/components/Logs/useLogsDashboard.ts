@@ -228,7 +228,8 @@ export const useLogsDashboard = ({ t }: UseLogsDashboardOptions) => {
     try {
       const all: RequestLog[] = []
       let exportPage = 1
-      const exportPageSize = 100
+      // 用后端允许的最大页长，减少往返与每页重复的 COUNT。
+      const exportPageSize = 200
       let total = 0
       do {
         const data = await fetchRequestLogs({

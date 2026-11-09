@@ -287,6 +287,8 @@ const handlers: Record<number, (...args: any[]) => any> = {
       toolCount: server.enabled
         ? mockMcpTools.filter((tool) => tool.serverId === server.id).length
         : 0,
+      // 演示数据的工具集固定：启用即版本 1，禁用为 0（页面据此决定是否重拉工具）。
+      toolsRevision: server.enabled ? 1 : 0,
     })),
   3609087734: () => 'http://127.0.0.1:18100/mcp',
   308868850: () => clone(mockMcpTools),

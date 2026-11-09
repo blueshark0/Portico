@@ -30,6 +30,8 @@ func sharedPricingService() *modelpricing.Service {
 	return sharedPricingSvc
 }
 
+const statsCacheTTL = 5 * time.Minute
+
 type SQLiteQueries struct {
 	pricing *modelpricing.Service
 
@@ -40,8 +42,10 @@ type SQLiteQueries struct {
 
 func NewSQLiteQueries() *SQLiteQueries {
 	return &SQLiteQueries{
-		pricing:            sharedPricingService(),
-		statsCache:         newTTLCache(30*time.Second, cloneLogStats),
+		pricing: sharedPricingService(),
+		// 统计缓存随 request_log 写入失效，TTL 只是兜底：旧的 30s TTL 与前端
+		// 30s 自动刷新同周期，几乎每次刷新都恰好过期、重新聚合。
+		statsCache:         newVersionedTTLCache(statsCacheTTL, cloneLogStats, currentRequestLogDataVersion),
 		providerDailyCache: newTTLCache(5*time.Minute, cloneProviderDailyStats),
 		heatmapCache:       newTTLCache(5*time.Minute, cloneHeatmapStats),
 	}
