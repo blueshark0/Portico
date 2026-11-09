@@ -24,14 +24,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
-          key: apt-${{ runner.os }}-gtk4-webkit6-${{ hashFiles('.github/workflows/test.yml') }}
+          key: apt-${{ runner.os }}-gtk3-webkit41-${{ hashFiles('.github/workflows/test.yml') }}
           restore-keys: |
-            apt-${{ runner.os }}-gtk4-webkit6-
+            apt-${{ runner.os }}-gtk3-webkit41-
 
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev
 
       # main.go 通过 //go:embed all:frontend/dist 嵌入前端产物，vet/test 前必须就位
       - name: Download frontend dist
@@ -41,10 +41,10 @@ jobs:
           path: frontend/dist
 
       - name: go vet
-        run: go vet ./...
+        run: go vet -tags gtk3 ./...
 
       - name: go test (race)
-        run: go test -race -count=1 ./...
+        run: go test -tags gtk3 -race -count=1 ./...
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -67,17 +67,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /var/cache/apt/archives
-          key: apt-${{ runner.os }}-gtk4-webkit6-${{ hashFiles('.github/workflows/test.yml') }}
+          key: apt-${{ runner.os }}-gtk3-webkit41-${{ hashFiles('.github/workflows/test.yml') }}
           restore-keys: |
-            apt-${{ runner.os }}-gtk4-webkit6-
+            apt-${{ runner.os }}-gtk3-webkit41-
 
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
+        run: go install -tags gtk3 github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
 
       - name: Generate bindings
         working-directory: .

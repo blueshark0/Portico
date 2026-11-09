@@ -13,7 +13,7 @@ Portico 的首个正式版本。它在 `127.0.0.1:18100` 启动本地 relay，�
 
 ## 安装
 
-本版本只提供 x86_64 Linux 安装包，需要 GTK 4.14 或更新版本和 WebKitGTK 6.0，例如 Ubuntu 24.04、Debian 13 或 Fedora 的较新版本。Ubuntu 22.04 和 Debian 12 的 GTK 版本过低，无法运行。macOS、Windows 和其他架构暂未提供安装包，可以从源码构建。
+本版本只提供 x86_64 Linux 安装包，最低支持 Ubuntu 22.04，需要 GTK 3 和 WebKit2GTK 4.1。Ubuntu 20.04 无法运行。macOS、Windows 和其他架构暂未提供安装包，可以从源码构建。
 
 | 发行版 | 文件 | 安装命令 |
 | --- | --- | --- |

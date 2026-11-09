@@ -24,22 +24,22 @@ contents:
   - src: "./build/linux/Portico.desktop"
     dst: "/usr/share/applications/Portico.desktop"
 
-# Default dependencies for Debian/Ubuntu with GTK4 and WebKitGTK 6.0
+# Default dependencies for Debian/Ubuntu with GTK3 and WebKit2GTK 4.1
 depends:
-  - libgtk-4-1 (>= 4.14)
-  - libwebkitgtk-6.0-4
+  - libgtk-3-0
+  - libwebkit2gtk-4.1-0
 
-# Distribution-specific overrides for GTK4 and WebKitGTK 6.0
+# Distribution-specific overrides for GTK3 and WebKit2GTK 4.1
 overrides:
   rpm:
     depends:
-      - gtk4 >= 4.14
-      - webkitgtk6.0
+      - gtk3
+      - webkit2gtk4.1
 
   archlinux:
     depends:
-      - gtk4
-      - webkitgtk-6.0
+      - gtk3
+      - webkit2gtk-4.1
 
 # scripts section to ensure desktop database is updated after install
 scripts:

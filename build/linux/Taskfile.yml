@@ -17,8 +17,9 @@ tasks:
     cmds:
       - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/{{.APP_NAME}}
     vars:
-      BINDING_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -buildvcs=false{{else}}-buildvcs=false{{end}}'
-      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-buildvcs=false -gcflags=all="-l"{{end}}'
+      # 使用 GTK3 + WebKit2GTK 4.1：Ubuntu 22.04 的 GTK4 只有 4.6，低于 Wails GTK4 后端的要求（4.14）。
+      BINDING_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production,gtk3 -buildvcs=false{{else}}-tags gtk3 -buildvcs=false{{end}}'
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production,gtk3 -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-tags gtk3 -buildvcs=false -gcflags=all="-l"{{end}}'
     env:
       GOOS: linux
       CGO_ENABLED: 1
