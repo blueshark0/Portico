@@ -11,7 +11,8 @@ permissions:
 jobs:
   build-linux:
     name: Build Linux (x86_64)
-    runs-on: ubuntu-24.04
+    # 在最低支持的系统上构建，产物依赖的 glibc 版本才不会高于 Ubuntu 22.04
+    runs-on: ubuntu-22.04
     env:
       ARCH: amd64
       # nfpm.yaml 通过环境变量读取架构和维护者
@@ -38,10 +39,10 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgtk-4-dev libwebkitgtk-6.0-dev
+          sudo apt-get install -y --no-install-recommends libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
+        run: go install -tags gtk3 github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
 
       # nfpm.yaml 里的版本号是固定值，打包前改成当前 tag，否则 deb/rpm 无法正常升级
       - name: Set package version

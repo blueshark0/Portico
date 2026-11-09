@@ -82,7 +82,7 @@ CLI 使用占位 token `portico` 向 relay 鉴权，**不会**写入你的真实
 | 其他 Linux · x86_64 | `portico-linux-amd64.AppImage` |
 | Linux 服务器（无桌面）· x86_64 | `portico-server-linux-amd64.tar.gz`，见[服务器部署](#服务器部署无桌面) |
 
-当前只发布 x86_64 Linux 版本，其他平台可[从源码构建](#从源码构建)。安装包需要 GTK 4.14 或更新版本和 WebKitGTK 6.0，例如 Ubuntu 24.04 或 Debian 13。
+当前只发布 x86_64 Linux 版本，其他平台可[从源码构建](#从源码构建)。最低支持 Ubuntu 22.04，安装包需要 GTK 3 和 WebKit2GTK 4.1。
 
 <!-- macOS 和 Windows 的发布暂时停用。恢复 release.yml 时一并恢复以下表格行和说明。
 | macOS · Apple Silicon | `portico-macos-arm64.zip` |
@@ -300,13 +300,13 @@ Portico 还能把你的 MCP server 聚合成一个 Streamable HTTP 端点，让�
 - **Wails 3.1.0 CLI**
 
   ```sh
-  go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
+  go install -tags gtk3 github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
   ```
 
-- **仅 Linux：** `libgtk-4-dev` 与 `libwebkitgtk-6.0-dev`
+- **仅 Linux：** `libgtk-3-dev` 与 `libwebkit2gtk-4.1-dev`
 
   ```sh
-  sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+  sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
   ```
 
 ### 从源码构建
