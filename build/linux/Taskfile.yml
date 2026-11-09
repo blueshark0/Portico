@@ -55,6 +55,14 @@ tasks:
       - cp {{.APP_BINARY}} {{.APP_NAME}}
       - cp ../../appicon.png {{.APP_NAME}}.png
       - wails3 generate appimage -binary {{.APP_NAME}} -icon {{.ICON}} -desktopfile {{.DESKTOP_FILE}} -outputdir {{.OUTPUT_DIR}} -builddir {{.ROOT_DIR}}/build/linux/appimage/build
+      # Wails 只打入主程序，而桌面壳要从同目录拉起 portico-server，所以放入后端再重新打包。
+      - |
+        appdir="$(ls -d "{{.ROOT_DIR}}"/build/linux/appimage/build/*.AppDir)"
+        image="$(basename "$appdir" .AppDir).AppImage"
+        cp "{{.ROOT_DIR}}/bin/portico-server" "$appdir/usr/bin/portico-server"
+        cd build
+        NO_STRIP=1 LDAI_OUTPUT="$image" ./linuxdeploy-*.AppImage --appimage-extract-and-run --appdir "$appdir" --output appimage
+        mv -f "$image" "{{.ROOT_DIR}}/bin/$image"
     vars:
       APP_NAME: '{{.APP_NAME}}'
       APP_BINARY: '../../../bin/{{.APP_NAME}}'
