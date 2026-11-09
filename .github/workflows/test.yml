@@ -40,13 +40,6 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
-      # main.go 通过 //go:embed all:frontend/dist 嵌入前端产物，vet/test 前必须就位
-      - name: Download frontend dist
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend/dist
-
       - name: go vet
         run: go vet ./...
 
