@@ -341,11 +341,11 @@ pnpm dev                   # http://localhost:9245
 
 ### 检查
 
-以下命令与 CI 在每次 push / PR 上执行的完全一致：
+以下命令与 CI 在每次 push / PR 上执行的完全一致。Linux 桌面端使用 Wails 的 GTK3 后端，所以 Go 命令需要加 `-tags gtk3`，否则会去找 GTK4：
 
 ```sh
-go vet ./...
-go test -race -count=1 ./...
+go vet -tags gtk3 ./...
+go test -tags gtk3 -race -count=1 ./...
 
 cd frontend
 pnpm install --frozen-lockfile
