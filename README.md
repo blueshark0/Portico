@@ -272,11 +272,11 @@ pnpm dev              # http://localhost:9245
 
 ### Checks
 
-These are exactly what CI runs on every push and pull request:
+These are exactly what CI runs on every push and pull request. On Linux the desktop app uses the Wails GTK3 backend, so Go commands need `-tags gtk3`; without it they look for GTK4:
 
 ```sh
-go vet ./...
-go test -race -count=1 ./...
+go vet -tags gtk3 ./...
+go test -tags gtk3 -race -count=1 ./...
 
 cd frontend
 pnpm install --frozen-lockfile
