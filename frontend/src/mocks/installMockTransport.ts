@@ -111,6 +111,9 @@ const syncMockActiveMapping = (provider: any) => {
 let catalogRevision = 1
 let catalogFingerprint = ''
 
+// 演示模式下已“授权”的 OAuth 服务。
+const mockMcpAuthorized = new Set<number>()
+
 // methodID → handler；未知 ID 返回 null（与真实运行时「方法存在但零值」行为接近）。
 const handlers: Record<number, (...args: any[]) => any> = {
   // routingfacade
@@ -307,13 +310,28 @@ const handlers: Record<number, (...args: any[]) => any> = {
       : { success: true, toolCount: 5, durationMs: 320 }
   },
   2403049257: () =>
-    mockMcpServers.map((server) => ({
-      serverId: server.id,
-      state: server.enabled ? 'connected' : 'disabled',
-      toolCount: server.enabled
-        ? mockMcpTools.filter((tool) => tool.serverId === server.id).length
-        : 0,
-    })),
+    mockMcpServers.map((server) => {
+      const needsAuth = server.authType === 'oauth' && !mockMcpAuthorized.has(server.id)
+      const live = server.enabled && !needsAuth
+      return {
+        serverId: server.id,
+        state: !server.enabled ? 'disabled' : needsAuth ? 'needs_auth' : 'connected',
+        toolCount: live ? mockMcpTools.filter((tool) => tool.serverId === server.id).length : 0,
+      }
+    }),
+  // StartOAuth：演示模式没有真实授权服务器，稍后直接视为授权完成。
+  1330205088: async (id: number) => {
+    await delay(300)
+    window.setTimeout(() => mockMcpAuthorized.add(id), 3000)
+    return 'https://example.com/oauth/authorize?demo=1'
+  },
+  // ClearOAuth
+  2100668963: (id: number) => {
+    mockMcpAuthorized.delete(id)
+    return null
+  },
+  // OAuthRedirectURL
+  1219843111: () => 'http://127.0.0.1:18100/mcp/oauth/callback',
   3609087734: () => 'http://127.0.0.1:18100/mcp',
   308868850: () => clone(mockMcpTools),
   314695828: (platform: string) => mockMcpInjection[platform] ?? false,

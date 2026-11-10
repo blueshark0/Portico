@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 import { Activity, Ellipsis, Plug, Plus } from 'lucide-vue-next'
 import BaseModal from '../common/BaseModal.vue'
 import McpEditorModal from './McpEditorModal.vue'
-import { useMcpServers } from './useMcpServers'
+import { isOAuthServer, useMcpServers } from './useMcpServers'
 import {
   ServerType,
   testMcpConnection,
@@ -34,6 +34,9 @@ const {
   submitEditor,
   submitEditorAndTest,
   toggleEnabled,
+  oauthState,
+  authorize,
+  clearAuthorization,
   askDelete,
   confirmDelete,
 } = useMcpServers(t)
@@ -71,7 +74,35 @@ const statusOf = (server: McpServerRecord) => {
   const state = statusMap.value[server.id]?.state
   if (state === 'connected') return { tone: 'success', label: t('mcpPage.status.connected') }
   if (state === 'failed') return { tone: 'danger', label: t('mcpPage.status.failed') }
+  if (state === 'needs_auth') return { tone: 'warning', label: t('mcpPage.status.needsAuth') }
   return { tone: 'muted', label: t('mcpPage.status.connecting') }
+}
+
+// OAuth 服务的授权情况只能从连接状态推断：连上即已授权，needs_auth 即未授权，
+// 其余（连接中、失败、未启用）不下结论。
+const oauthSummary = (server: McpServerRecord) => {
+  const state = server.enabled ? statusMap.value[server.id]?.state : undefined
+  if (state === 'needs_auth') return t('mcpPage.detail.oauthNeeded')
+  if (state === 'connected') return t('mcpPage.detail.oauthAuthorized')
+  return t('mcpPage.detail.oauthOther')
+}
+
+const needsAuth = (server: McpServerRecord) =>
+  server.enabled && statusMap.value[server.id]?.state === 'needs_auth'
+
+const isAuthorized = (server: McpServerRecord) =>
+  server.enabled && statusMap.value[server.id]?.state === 'connected'
+
+const pendingAuthUrl = (server: McpServerRecord) =>
+  oauthState.pending?.serverId === server.id ? oauthState.pending.url : ''
+
+const copyAuthLink = async (server: McpServerRecord) => {
+  try {
+    await navigator.clipboard.writeText(pendingAuthUrl(server))
+    showToast(t('mcpPage.messages.linkCopied'), 'success')
+  } catch (error) {
+    showToast(getErrorMessage(error, t('mcpPage.messages.copyFailed')), 'error')
+  }
 }
 
 const toolCountOf = (server: McpServerRecord) => statusMap.value[server.id]?.toolCount ?? 0
@@ -121,6 +152,8 @@ const runTest = async (server: McpServerRecord) => {
     const result = await testMcpConnection(server)
     if (result.success) {
       showToast(t('mcpPage.messages.testOk', { count: result.toolCount, ms: result.durationMs }))
+    } else if (result.needsAuth) {
+      showToast(t('mcpPage.messages.needsAuth'))
     } else {
       showToast(t('mcpPage.messages.testErr', { error: result.error ?? '' }), 'error')
     }
@@ -249,6 +282,43 @@ const openDiagnostics = (server?: McpServerRecord) => {
           {{ selectedServer.type === ServerType.ServerTypeStdio ? t('mcpPage.detail.command') : t('mcpPage.detail.url') }}
         </p>
         <div class="mcp-command cs-mono">{{ serverCommand(selectedServer) }}</div>
+
+        <template v-if="isOAuthServer(selectedServer)">
+          <p class="mcp-detail-label">{{ t('mcpPage.detail.auth') }}</p>
+          <p class="mcp-detail-value">{{ oauthSummary(selectedServer) }}</p>
+          <div v-if="selectedServer.enabled" class="mcp-oauth-actions">
+            <button
+              type="button"
+              class="cs-btn"
+              :class="{ 'cs-btn--primary': needsAuth(selectedServer) }"
+              :disabled="oauthState.busyId !== 0"
+              @click="authorize(selectedServer)"
+            >
+              {{
+                oauthState.busyId === selectedServer.id
+                  ? t('mcpPage.actions.authorizing')
+                  : needsAuth(selectedServer)
+                    ? t('mcpPage.actions.authorize')
+                    : t('mcpPage.actions.reauthorize')
+              }}
+            </button>
+            <button
+              v-if="isAuthorized(selectedServer)"
+              type="button"
+              class="cs-btn"
+              :disabled="oauthState.busyId !== 0"
+              @click="clearAuthorization(selectedServer)"
+            >
+              {{ t('mcpPage.actions.clearAuth') }}
+            </button>
+          </div>
+          <p v-if="pendingAuthUrl(selectedServer)" class="mcp-oauth-pending">
+            {{ t('mcpPage.detail.oauthPending') }}
+            <button type="button" class="mcp-oauth-link" @click="copyAuthLink(selectedServer)">
+              {{ t('mcpPage.detail.oauthCopyLink') }}
+            </button>
+          </p>
+        </template>
 
         <template v-if="statusMap[selectedServer.id]?.error">
           <p class="mcp-detail-label">{{ t('mcpPage.detail.lastError') }}</p>
@@ -533,6 +603,29 @@ const openDiagnostics = (server?: McpServerRecord) => {
   color: var(--cs-text);
   word-break: break-all;
   user-select: text;
+}
+
+.mcp-oauth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 8px;
+}
+
+.mcp-oauth-pending {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--cs-text-secondary);
+}
+
+.mcp-oauth-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--cs-brand);
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .mcp-detail-error {

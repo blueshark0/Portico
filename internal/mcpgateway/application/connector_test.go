@@ -36,7 +36,7 @@ func TestStaticHeaderRoundTripperRedirectSafety(t *testing.T) {
 	}))
 	defer redirector.Close()
 
-	client := &http.Client{Transport: newStaticHeaderRoundTripper(redirector.URL, map[string]string{
+	client := &http.Client{Transport: newStaticHeaderRoundTripper(nil, redirector.URL, map[string]string{
 		"Authorization": "Bearer secret",
 	})}
 
@@ -64,7 +64,7 @@ func TestDefaultConnectorListChangedCallback(t *testing.T) {
 	defer ts.Close()
 
 	var notified atomic.Int64
-	connect := defaultConnector("test", func(id int64) { notified.Store(id) })
+	connect := defaultConnector("test", func(id int64) { notified.Store(id) }, nil)
 	cfg := domain.McpServer{ID: 42, Name: "up", Type: domain.ServerTypeHTTP, URL: ts.URL}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

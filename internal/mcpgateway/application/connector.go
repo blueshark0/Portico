@@ -15,8 +15,9 @@ import (
 )
 
 // defaultConnector 按类型构造真实上游连接。onToolsChanged 在上游发出
-// notifications/tools/list_changed 时回调（nil 则不订阅）。
-func defaultConnector(appVersion string, onToolsChanged func(serverID int64)) Connector {
+// notifications/tools/list_changed 时回调（nil 则不订阅）。oauth 为 nil 时
+// 不支持 OAuth 认证的上游。
+func defaultConnector(appVersion string, onToolsChanged func(serverID int64), oauth *OAuthManager) Connector {
 	if appVersion == "" {
 		appVersion = "dev"
 	}
@@ -37,10 +38,23 @@ func defaultConnector(appVersion string, onToolsChanged func(serverID int64)) Co
 			cmd.Env = stdioEnvironment(os.Environ(), cfg.Env)
 			transport = &mcp.CommandTransport{Command: cmd}
 		case domain.ServerTypeHTTP:
-			transport = &mcp.StreamableClientTransport{
+			streamable := &mcp.StreamableClientTransport{
 				Endpoint:   cfg.URL,
-				HTTPClient: &http.Client{Transport: newStaticHeaderRoundTripper(cfg.URL, cfg.Headers)},
+				HTTPClient: &http.Client{Transport: newStaticHeaderRoundTripper(nil, cfg.URL, cfg.Headers)},
 			}
+			if cfg.AuthType == domain.AuthTypeOAuth {
+				if oauth == nil {
+					return nil, fmt.Errorf("未启用 OAuth 支持")
+				}
+				// 没有已保存的令牌时在这里直接返回 ErrAuthorizationRequired，
+				// 后台连接不会去打扰授权服务器或用户。
+				handler, err := oauth.handlerFor(ctx, cfg)
+				if err != nil {
+					return nil, err
+				}
+				streamable.OAuthHandler = handler
+			}
+			transport = streamable
 		default:
 			return nil, fmt.Errorf("未知上游类型: %q", cfg.Type)
 		}
@@ -67,8 +81,11 @@ type staticHeaderRoundTripper struct {
 	headers    map[string]string
 }
 
-func newStaticHeaderRoundTripper(endpoint string, headers map[string]string) http.RoundTripper {
-	rt := staticHeaderRoundTripper{base: http.DefaultTransport, headers: headers}
+func newStaticHeaderRoundTripper(base http.RoundTripper, endpoint string, headers map[string]string) http.RoundTripper {
+	if base == nil {
+		base = http.DefaultTransport
+	}
+	rt := staticHeaderRoundTripper{base: base, headers: headers}
 	if u, err := url.Parse(endpoint); err == nil {
 		rt.targetHost = u.Host
 	}

@@ -226,7 +226,8 @@
         "errors": {
           "name": "名称需以字母或数字开头，仅含字母数字、- 和 _（不含连续 __），最长 32 字符",
           "command": "stdio 类型必须填写启动命令",
-          "url": "HTTP 类型必须填写服务地址"
+          "url": "HTTP 类型必须填写服务地址",
+          "oauthSecretWithoutId": "填写 Client Secret 时必须同时填写 Client ID"
         },
         "subtitleStdio": "stdio 适用于本地命令行进程",
         "subtitleHttp": "配置远程 HTTP 端点与可选认证",
@@ -235,7 +236,17 @@
         "authCustom": "自定义请求头",
         "token": "访问令牌",
         "argsHint": "参数按顺序配置，不要将整行拼成 shell 命令。",
-        "saveAndTest": "保存并测试"
+        "saveAndTest": "保存并测试",
+        "authOAuth": "OAuth（浏览器登录授权）",
+        "oauthHint": "保存后在服务详情里点击“授权”，在浏览器中完成登录；令牌由 Portico 保管并自动刷新。",
+        "oauthAdvanced": "高级选项",
+        "oauthClientName": "客户端名称（可选）",
+        "oauthClientNameHint": "向授权服务器注册时上报的名称，留空为 Portico。部分服务只接受白名单内的客户端名称；填写其他客户端的名称属于冒用身份，可能违反该服务的条款并随时失效，请自行评估风险。",
+        "oauthClientId": "Client ID（可选）",
+        "oauthClientIdHint": "该服务不支持自动注册时，填写你在其后台预先注册的客户端；填写后不再自动注册。",
+        "oauthClientSecret": "Client Secret（可选）",
+        "oauthRedirect": "回调地址",
+        "oauthRedirectHint": "预先注册客户端时，把这个地址登记为允许的重定向地址。"
       },
       "confirm": {
         "title": "删除 MCP 服务",
@@ -255,7 +266,12 @@
         "injectionRemoved": "已移除注入",
         "injectionFailed": "注入操作失败",
         "copied": "端点已复制",
-        "copyFailed": "复制失败"
+        "copyFailed": "复制失败",
+        "needsAuth": "已保存。该服务需要授权，请在服务详情里点击“授权”",
+        "oauthStarted": "已在浏览器中打开授权页面，完成登录后会自动连接",
+        "oauthStartFailed": "发起授权失败",
+        "oauthCleared": "已清除授权",
+        "oauthClearFailed": "清除授权失败"
       }
     },
     "logs": {
@@ -899,7 +915,11 @@
       "edit": "编辑服务",
       "test": "测试连接",
       "testing": "测试中…",
-      "openDiagnostics": "打开 MCP 诊断与工具详情"
+      "openDiagnostics": "打开 MCP 诊断与工具详情",
+      "authorize": "授权",
+      "authorizing": "正在发起…",
+      "reauthorize": "重新授权",
+      "clearAuth": "清除授权"
     },
     "cli": {
       "title": "CLI 接入",
@@ -918,7 +938,8 @@
       "connected": "运行正常",
       "connecting": "连接中",
       "failed": "连接失败",
-      "disabled": "未启用"
+      "disabled": "未启用",
+      "needsAuth": "待授权"
     },
     "localProcess": "本地进程",
     "remoteService": "远程服务",
@@ -938,7 +959,13 @@
       "lastError": "最近错误",
       "toolsTitle": "工具清单",
       "toolsEmpty": "暂无已发现工具",
-      "toolsMore": "… 另有 {count} 个，详见诊断页"
+      "toolsMore": "… 另有 {count} 个，详见诊断页",
+      "auth": "认证",
+      "oauthNeeded": "OAuth · 尚未授权",
+      "oauthAuthorized": "OAuth · 已授权",
+      "oauthOther": "OAuth",
+      "oauthPending": "浏览器没有自动打开？",
+      "oauthCopyLink": "复制授权链接"
     },
     "delete": {
       "title": "删除 MCP 服务",
@@ -948,7 +975,10 @@
     "messages": {
       "testOk": "连接成功，发现 {count} 个工具（{ms}ms）",
       "testErr": "连接失败：{error}",
-      "testFailed": "测试连接失败"
+      "testFailed": "测试连接失败",
+      "needsAuth": "该服务需要授权，请先点击“授权”",
+      "linkCopied": "授权链接已复制",
+      "copyFailed": "复制失败"
     }
   },
   "mcpDiag": {
@@ -1069,7 +1099,8 @@
       "connected": "连接正常",
       "connecting": "连接中",
       "failed": "连接失败",
-      "disabled": "未启用"
+      "disabled": "未启用",
+      "needsAuth": "待授权"
     },
     "messages": {
       "loadFailed": "加载诊断数据失败",
@@ -1077,7 +1108,8 @@
       "copyFailed": "复制失败",
       "rediagnosed": "诊断已刷新",
       "testErr": "连接失败：{error}",
-      "testFailed": "测试连接失败"
+      "testFailed": "测试连接失败",
+      "needsAuth": "该服务需要授权，请回到 MCP 页面完成授权"
     }
   },
   "settingsPage": {

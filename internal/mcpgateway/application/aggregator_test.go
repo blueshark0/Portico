@@ -430,7 +430,7 @@ func TestStdioConnectorHelperProcess(t *testing.T) {
 	t.Setenv("APPDIR", appDir)
 	t.Setenv("PYTHONHOME", appDir+"/usr")
 	t.Setenv("PYTHONPATH", appDir+"/usr/share/pyshared")
-	connect := defaultConnector("test", nil)
+	connect := defaultConnector("test", nil, nil)
 	cfg := domain.McpServer{
 		Name: "helper", Type: domain.ServerTypeStdio,
 		Command: os.Args[0], Args: []string{"-test.run=TestStdioConnectorHelperProcess"},

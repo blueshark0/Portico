@@ -71,6 +71,8 @@ type Options struct {
 	RetentionCleanup func() error
 	// MCPGateway 聚合 MCP 网关；nil 时不暴露 /mcp。
 	MCPGateway MCPGateway
+	// MCPOAuthCallback 处理上游 MCP 服务 OAuth 授权的浏览器回调；nil 时不注册该路由。
+	MCPOAuthCallback http.Handler
 }
 
 type Server struct {
@@ -86,6 +88,7 @@ type Server struct {
 	requestLogWorker    *worker.BackgroundWorker[*observabilitydomain.RequestLog]
 	sessionUpdateWorker *worker.BackgroundWorker[sessionUpdateRequest]
 	mcpGateway          MCPGateway
+	mcpOAuthCallback    http.Handler
 	shutdownCh          chan struct{}
 	backgroundWG        sync.WaitGroup
 	shutdownOnce        sync.Once
@@ -108,6 +111,7 @@ func NewServer(routingService *routingapp.Service, sessionService *sessionapp.Se
 		retentionCleanup: opts.RetentionCleanup,
 		requestLogSink:   opts.RequestLogSink,
 		mcpGateway:       opts.MCPGateway,
+		mcpOAuthCallback: opts.MCPOAuthCallback,
 		addr:             addr,
 		shutdownCh:       make(chan struct{}),
 	}

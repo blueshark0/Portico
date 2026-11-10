@@ -55,6 +55,23 @@ func (f *McpGatewayFacade) RuntimeSnapshot(knownRevision uint64) mcpapp.GatewayR
 	return f.mcpService.RuntimeSnapshot(knownRevision)
 }
 
+// StartOAuth 为一个已保存、认证方式为 OAuth 的服务发起授权，返回需要在
+// 浏览器中打开的授权 URL；授权完成后上游会自动重连。
+func (f *McpGatewayFacade) StartOAuth(id int64) (string, error) {
+	return f.mcpService.StartOAuth(context.Background(), id)
+}
+
+// ClearOAuth 删除一个服务已保存的 OAuth 凭证，使其回到待授权状态。
+func (f *McpGatewayFacade) ClearOAuth(id int64) error {
+	return f.mcpService.ClearOAuth(context.Background(), id)
+}
+
+// OAuthRedirectURL 注册给授权服务器的回调地址，供 UI 展示
+// （使用预注册客户端时需在第三方后台登记该地址）。
+func (f *McpGatewayFacade) OAuthRedirectURL() string {
+	return f.mcpService.OAuthRedirectURL()
+}
+
 // Endpoint 网关聚合端点地址，供 UI 展示/复制。
 func (f *McpGatewayFacade) Endpoint() string {
 	return f.endpoint

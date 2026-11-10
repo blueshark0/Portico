@@ -28,7 +28,15 @@ func (s *Server) readRequestBody(c *gin.Context) ([]byte, error) {
 	return data, nil
 }
 
+// MCPOAuthCallbackPath 上游 MCP 服务 OAuth 授权的回调路径（即注册的 redirect_uri 的路径部分）。
+const MCPOAuthCallbackPath = "/mcp/oauth/callback"
+
 func (s *Server) registerRoutes(router gin.IRouter) {
+	if s.mcpOAuthCallback != nil {
+		// 必须注册在入站鉴权中间件之前：这个请求由授权服务器的浏览器重定向
+		// 触发，带不了占位 token。它不接触任何供应商凭证，自身靠一次性 state 校验。
+		router.GET(MCPOAuthCallbackPath, gin.WrapH(s.mcpOAuthCallback))
+	}
 	router.Use(s.inboundAuthMiddleware())
 	router.POST("/v1/messages", s.proxyHandler(kernel.PlatformClaude, "/v1/messages"))
 	router.POST("/responses", s.proxyHandler(kernel.PlatformCodex, "/responses"))

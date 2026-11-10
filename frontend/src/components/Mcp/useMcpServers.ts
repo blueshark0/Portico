@@ -1,7 +1,9 @@
 import { computed, onUnmounted, reactive, ref, shallowRef } from 'vue'
 import {
+  AuthType,
   McpServer,
   ServerType,
+  clearMcpOAuth,
   deleteMcpServer,
   fetchInjectionStatus,
   fetchMcpEndpoint,
@@ -11,6 +13,7 @@ import {
   removeMcpInjection,
   saveMcpServer,
   setMcpServerEnabled,
+  startMcpOAuth,
   testMcpConnection,
   type McpServerRecord,
   type TestResult,
@@ -20,6 +23,7 @@ import {
 import { getErrorMessage } from '../../utils/errors'
 import { showToast } from '../../utils/toast'
 import { runWithToast } from '../../utils/runWithToast'
+import { openExternal } from '../../utils/openExternal'
 
 export type McpPlatform = 'claude' | 'codex'
 
@@ -37,6 +41,10 @@ export type McpServerForm = {
   envText: string // 每行 KEY=VALUE
   url: string
   headersText: string // 每行 KEY=VALUE
+  oauth: boolean // 认证方式为 OAuth；以下三项仅此时有意义，且都可留空
+  oauthClientName: string
+  oauthClientId: string
+  oauthClientSecret: string
   enabled: boolean
   timeoutText: string
 }
@@ -50,6 +58,10 @@ const emptyForm = (): McpServerForm => ({
   envText: '',
   url: '',
   headersText: '',
+  oauth: false,
+  oauthClientName: '',
+  oauthClientId: '',
+  oauthClientSecret: '',
   enabled: true,
   timeoutText: '30',
 })
@@ -69,8 +81,12 @@ const parseKvLines = (text: string): Record<string, string> | undefined => {
 const kvToText = (m?: Partial<Record<string, string>>): string =>
   m ? Object.entries(m).map(([k, v]) => `${k}=${v ?? ''}`).join('\n') : ''
 
-export const formToRecord = (form: McpServerForm, position: number): McpServerRecord =>
-  new McpServer({
+export const isOAuthServer = (server: Pick<McpServerRecord, 'type' | 'authType'>): boolean =>
+  server.type === ServerType.ServerTypeHTTP && server.authType === AuthType.AuthTypeOAuth
+
+export const formToRecord = (form: McpServerForm, position: number): McpServerRecord => {
+  const oauth = form.type === ServerType.ServerTypeHTTP && form.oauth
+  return new McpServer({
     id: form.id,
     name: form.name.trim(),
     type: form.type,
@@ -79,10 +95,15 @@ export const formToRecord = (form: McpServerForm, position: number): McpServerRe
     env: form.type === ServerType.ServerTypeStdio ? parseKvLines(form.envText) : undefined,
     url: form.type === ServerType.ServerTypeHTTP ? form.url.trim() : '',
     headers: form.type === ServerType.ServerTypeHTTP ? parseKvLines(form.headersText) : undefined,
+    authType: oauth ? AuthType.AuthTypeOAuth : AuthType.AuthTypeNone,
+    oauthClientName: oauth ? form.oauthClientName.trim() : '',
+    oauthClientId: oauth ? form.oauthClientId.trim() : '',
+    oauthClientSecret: oauth ? form.oauthClientSecret.trim() : '',
     enabled: form.enabled,
     position,
     timeoutSec: parseInt(form.timeoutText, 10) || 30,
   })
+}
 
 export const recordToForm = (record: McpServerRecord): McpServerForm => ({
   id: record.id,
@@ -93,6 +114,10 @@ export const recordToForm = (record: McpServerRecord): McpServerForm => ({
   envText: kvToText(record.env),
   url: record.url ?? '',
   headersText: kvToText(record.headers),
+  oauth: isOAuthServer(record),
+  oauthClientName: record.oauthClientName ?? '',
+  oauthClientId: record.oauthClientId ?? '',
+  oauthClientSecret: record.oauthClientSecret ?? '',
   enabled: record.enabled,
   timeoutText: String(record.timeoutSec || 30),
 })
@@ -129,6 +154,12 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
 
   const confirmState = reactive({ open: false, target: null as McpServerRecord | null, busy: false })
 
+  // pending：最近一次发起的授权（浏览器没自动打开时，界面提供同一链接供手动打开）。
+  const oauthState = reactive({
+    busyId: 0,
+    pending: null as { serverId: number; url: string } | null,
+  })
+
   const totalTools = computed(() =>
     Object.values(statuses.value).reduce((sum, s) => sum + (s.toolCount || 0), 0),
   )
@@ -146,6 +177,9 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
     const next: Record<number, UpstreamStatus> = {}
     for (const st of list) next[st.serverId] = st
     statuses.value = next
+    // 授权完成、上游已连上：手动打开链接的提示不再需要。
+    const pending = oauthState.pending
+    if (pending && next[pending.serverId]?.state === 'connected') oauthState.pending = null
   }
 
   // 进行中的请求可能早于刚完成的变更，默认补发一次；只有定时轮询才可以直接跳过。
@@ -202,6 +236,10 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
     if (form.type === ServerType.ServerTypeStdio && !form.command.trim())
       return t('components.mcp.form.errors.command')
     if (form.type === ServerType.ServerTypeHTTP && !form.url.trim()) return t('components.mcp.form.errors.url')
+    if (form.type === ServerType.ServerTypeHTTP && form.oauth) {
+      if (form.oauthClientSecret.trim() && !form.oauthClientId.trim())
+        return t('components.mcp.form.errors.oauthSecretWithoutId')
+    }
     return ''
   }
 
@@ -262,11 +300,18 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
   const submitEditorAndTest = async (): Promise<void> => {
     const saved = await submitEditor()
     if (!saved) return
+    await testSaved(saved)
+  }
+
+  const testSaved = async (saved: McpServerRecord): Promise<void> => {
     editorState.testing = true
     try {
       const result = await testMcpConnection(saved)
       if (result.success) {
         showToast(t('components.mcp.form.testOk', { count: result.toolCount, ms: result.durationMs }))
+      } else if (result.needsAuth) {
+        // 刚保存的 OAuth 服务还没有令牌：这不是故障，引导用户去授权。
+        showToast(t('components.mcp.messages.needsAuth'))
       } else {
         showToast(t('components.mcp.form.testErr', { error: result.error ?? '' }), 'error')
       }
@@ -301,6 +346,39 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
     } finally {
       editorState.testing = false
     }
+  }
+
+  // 发起 OAuth 授权：后端返回授权 URL，这里交给系统浏览器；用户登录后
+  // 授权服务器回调本机 relay，上游自动重连，状态轮询会反映出来。
+  const authorize = async (record: McpServerRecord) => {
+    if (oauthState.busyId) return
+    oauthState.busyId = record.id
+    try {
+      const url = await startMcpOAuth(record.id)
+      oauthState.pending = { serverId: record.id, url }
+      await openExternal(url)
+      showToast(t('components.mcp.messages.oauthStarted'))
+    } catch (err) {
+      showToast(getErrorMessage(err, t('components.mcp.messages.oauthStartFailed')), 'error')
+    } finally {
+      oauthState.busyId = 0
+    }
+    void refreshStatuses()
+  }
+
+  const clearAuthorization = async (record: McpServerRecord) => {
+    if (oauthState.busyId) return
+    oauthState.busyId = record.id
+    try {
+      await clearMcpOAuth(record.id)
+      if (oauthState.pending?.serverId === record.id) oauthState.pending = null
+      showToast(t('components.mcp.messages.oauthCleared'), 'success')
+    } catch (err) {
+      showToast(getErrorMessage(err, t('components.mcp.messages.oauthClearFailed')), 'error')
+    } finally {
+      oauthState.busyId = 0
+    }
+    void refreshStatuses()
   }
 
   const toggleEnabled = async (record: McpServerRecord) => {
@@ -376,6 +454,7 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
     injecting,
     editorState,
     confirmState,
+    oauthState,
     totalTools,
     loadAll,
     refreshStatuses,
@@ -386,6 +465,8 @@ export function useMcpServers(t: (key: string, ...args: unknown[]) => string) {
     submitEditorAndTest,
     runTest,
     toggleEnabled,
+    authorize,
+    clearAuthorization,
     askDelete,
     confirmDelete,
     toggleInjection,

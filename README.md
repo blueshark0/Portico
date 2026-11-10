@@ -163,12 +163,15 @@ Portico also aggregates your MCP servers into a single Streamable HTTP endpoint,
 | **Endpoint** | `http://127.0.0.1:18100/mcp` (POST / GET / DELETE) |
 | **Auth** | `Authorization: Bearer portico` |
 | **Upstreams** | `stdio` (command, args, env) or `http` (Streamable HTTP URL, headers) |
+| **Upstream auth** | None, bearer token, custom headers, or OAuth (browser sign-in) for remote servers that follow the MCP authorization spec |
 | **Tool naming** | `<server>__<tool>`, e.g. `context7__resolve-library-id`; names over 64 chars get a hash suffix |
 | **Safety** | Upstream headers are only sent to the host they were configured for, so a redirect cannot exfiltrate credentials. Server names may not contain `__`. |
 
 1. Add servers on the **MCP Servers** page, test the connection, and enable them.
 2. Turn on CLI injection for **Claude Code** and **Codex**; only the `portico` entry is touched, your own MCP entries are left alone. Restart the CLI to pick it up.
 3. Use **Gateway diagnostics** to inspect upstream health, latency, tool schemas and downstream naming.
+
+**OAuth upstreams.** For a remote server that requires sign-in, choose **OAuth** as the auth method, save, then click **Authorize** in the server details. Portico discovers the authorization server, registers itself as a client, opens your browser and stores the resulting tokens in `app.db`, refreshing them as needed. The redirect lands on `http://127.0.0.1:18100/mcp/oauth/callback`, so the sign-in has to happen in a browser on the same machine. Under **Advanced** you can set the client name used for registration, or supply a pre-registered client ID (and secret) for services that do not allow automatic registration. Services that only accept allow-listed clients will reject the registration.
 
 For any other MCP client that supports Streamable HTTP, connect manually to the endpoint above with the bearer header. Enabled upstreams and their tools are visible downstream immediately, and upstream `tools/list_changed` notifications refresh the registry without a reconnect.
 
@@ -178,7 +181,7 @@ Everything lives in `~/.portico/` on your machine:
 
 | Path | Contents |
 | --- | --- |
-| `app.db` | Provider profiles and API keys, preferences, WebDAV settings, MCP servers |
+| `app.db` | Provider profiles and API keys, preferences, WebDAV settings, MCP servers and their OAuth tokens |
 | `request_log.db` | Per-request usage records, retained for **30 days** |
 | `session.db` | Session → provider bindings |
 | `hotkeys.db` | Hotkey settings |

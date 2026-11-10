@@ -60,6 +60,10 @@ export type MockMcpServer = {
   env?: Record<string, string>
   url?: string
   headers?: Record<string, string>
+  authType?: string
+  oauthClientName?: string
+  oauthClientId?: string
+  oauthClientSecret?: string
   enabled: boolean
   position: number
   timeoutSec: number

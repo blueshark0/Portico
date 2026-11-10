@@ -62,6 +62,7 @@ const statusOf = (server: McpServerRecord) => {
   const state = statusMap.value[server.id]?.state
   if (state === 'connected') return { tone: 'success', label: t('mcpDiag.status.connected') }
   if (state === 'failed') return { tone: 'danger', label: t('mcpDiag.status.failed') }
+  if (state === 'needs_auth') return { tone: 'warning', label: t('mcpDiag.status.needsAuth') }
   return { tone: 'muted', label: t('mcpDiag.status.connecting') }
 }
 
@@ -137,7 +138,9 @@ const rediagnoseUpstream = async (server: McpServerRecord) => {
         ok: result.success,
       },
     }
-    if (!result.success) {
+    if (result.needsAuth) {
+      showToast(t('mcpDiag.messages.needsAuth'))
+    } else if (!result.success) {
       showToast(t('mcpDiag.messages.testErr', { error: result.error ?? '' }), 'error')
     }
   } catch (error) {

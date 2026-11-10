@@ -4,6 +4,7 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"log"
@@ -45,6 +46,8 @@ const (
 	StateConnected  = "connected"
 	StateFailed     = "failed"
 	StateDisabled   = "disabled"
+	// StateNeedsAuth 上游要求 OAuth 授权：等用户在 UI 里发起授权，不做退避重连。
+	StateNeedsAuth = "needs_auth"
 )
 
 // UpstreamStatus 供 UI 轮询的状态快照。
@@ -139,6 +142,8 @@ type toolRef struct {
 type AggregatorOptions struct {
 	AppVersion string
 	Connector  Connector // nil → 默认 stdio/http connector
+	// OAuth 代持上游 OAuth 凭证；nil 时 authType=oauth 的上游无法连接。
+	OAuth *OAuthManager
 }
 
 // NewAggregator 创建聚合器；opts 零值可用（默认 connector、无版本号）。
@@ -154,9 +159,12 @@ func NewAggregator(repo Repository, opts AggregatorOptions) *Aggregator {
 	}
 	connect := opts.Connector
 	if connect == nil {
-		connect = defaultConnector(opts.AppVersion, a.onUpstreamToolsChanged)
+		connect = defaultConnector(opts.AppVersion, a.onUpstreamToolsChanged, opts.OAuth)
 	}
 	a.connect = connect
+	if opts.OAuth != nil {
+		opts.OAuth.setNotifier(a.onOAuthResult)
+	}
 	a.mcpServer = mcp.NewServer(
 		&mcp.Implementation{Name: "portico", Version: opts.AppVersion},
 		&mcp.ServerOptions{
@@ -408,6 +416,18 @@ func (a *Aggregator) finishConnect(id int64, gen int64, session UpstreamSession,
 		}
 		return
 	}
+	if errors.Is(connErr, ErrAuthorizationRequired) {
+		// 不设 nextRetry：reconciler 只重试 failed 态，这里会一直停到用户授权
+		// （Reconnect）或配置变更为止。
+		up.state = StateNeedsAuth
+		up.err = authorizationRequiredDetail(connErr)
+		up.backoffIdx = 0
+		up.nextRetry = time.Time{}
+		name := up.cfg.Name
+		a.mu.Unlock()
+		log.Printf("mcpgateway: 上游 %q 需要 OAuth 授权: %v", name, connErr)
+		return
+	}
 	if connErr != nil {
 		up.state = StateFailed
 		up.err = connErr.Error()
@@ -634,13 +654,49 @@ func (a *Aggregator) markFailed(serverID int64, session UpstreamSession, callErr
 	a.detachLocked(up)
 	a.flushCatalogLocked()
 	up.session = nil
+	name := cfg.Name
+	if errors.Is(callErr, ErrAuthorizationRequired) {
+		// 令牌中途失效且无法刷新：重连也只会得到同样的结果，直接等用户授权。
+		up.state = StateNeedsAuth
+		up.err = authorizationRequiredDetail(callErr)
+		up.nextRetry = time.Time{}
+		a.mu.Unlock()
+		log.Printf("mcpgateway: 上游 %q 的 OAuth 授权已失效，等待重新授权: %v", name, callErr)
+		return
+	}
 	up.state = StateFailed
 	up.err = callErr.Error()
 	up.nextRetry = a.now().Add(backoffSteps[0])
-	name := cfg.Name
 	a.mu.Unlock()
 	log.Printf("mcpgateway: 上游 %q 调用失败，转入重连: %v", name, callErr)
 	a.NotifyChanged()
+}
+
+// Reconnect 丢弃某个上游的当前连接并立即重新连接（授权完成或凭证被清除后调用）。
+func (a *Aggregator) Reconnect(id int64) {
+	a.mu.Lock()
+	if a.closed {
+		a.mu.Unlock()
+		return
+	}
+	a.teardownLocked(id)
+	a.flushCatalogLocked()
+	a.mu.Unlock()
+	a.NotifyChanged()
+}
+
+// onOAuthResult 交互授权结束时由 OAuthManager 回调：成功则重连，
+// 失败则把原因挂到待授权的上游上供 UI 展示。
+func (a *Aggregator) onOAuthResult(id int64, authErr error) {
+	if authErr == nil {
+		a.Reconnect(id)
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if up := a.ups[id]; up != nil && up.state == StateNeedsAuth {
+		up.err = authErr.Error()
+	}
 }
 
 // ToolCatalog 全部上游已发布工具的快照（按 serverID、公共名排序，输出稳定），
@@ -718,7 +774,12 @@ func (a *Aggregator) TestConnection(ctx context.Context, cfg domain.McpServer) (
 	defer cancel()
 	session, err := a.connect(ctx, cfg)
 	if err != nil {
-		return domain.TestResult{Success: false, Error: err.Error(), DurationMs: time.Since(start).Milliseconds()}, nil
+		return domain.TestResult{
+			Success:    false,
+			Error:      err.Error(),
+			NeedsAuth:  errors.Is(err, ErrAuthorizationRequired),
+			DurationMs: time.Since(start).Milliseconds(),
+		}, nil
 	}
 	defer func() { _ = session.Close() }()
 	count := 0

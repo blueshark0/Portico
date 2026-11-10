@@ -98,3 +98,60 @@ func TestMcpRouteAbsentWhenGatewayNil(t *testing.T) {
 		t.Fatalf("未装配网关时 /mcp 应 404，实际 %d", recorder.Code)
 	}
 }
+
+// OAuth 回调由浏览器跳转触发，带不了占位 token：它必须绕过入站鉴权，
+// 而其余路由的鉴权不能因此松动。
+func TestMcpOAuthCallbackBypassesInboundAuth(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var gotQuery string
+	server := &Server{
+		mcpGateway: newStubMcpGateway(),
+		mcpOAuthCallback: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotQuery = r.URL.RawQuery
+			w.WriteHeader(http.StatusNoContent)
+		}),
+	}
+	router := gin.New()
+	server.registerRoutes(router)
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, MCPOAuthCallbackPath+"?code=c&state=s", nil))
+	if recorder.Code != http.StatusNoContent || gotQuery != "code=c&state=s" {
+		t.Fatalf("回调应无需 token 直达 handler，实际 %d query=%q", recorder.Code, gotQuery)
+	}
+
+	for _, probe := range []struct{ method, path string }{
+		{http.MethodPost, "/mcp"},
+		{http.MethodGet, "/mcp"},
+		{http.MethodPost, "/v1/messages"},
+		{http.MethodPost, "/responses"},
+	} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(probe.method, probe.path, nil))
+		if recorder.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s 无 token 应 401，实际 %d", probe.method, probe.path, recorder.Code)
+		}
+	}
+
+	// 回调只接受 GET，其他方法不会落到 handler 上。
+	recorder = httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, MCPOAuthCallbackPath, nil))
+	if recorder.Code == http.StatusNoContent {
+		t.Fatal("回调路由不应接受 POST")
+	}
+}
+
+func TestMcpOAuthCallbackAbsentWhenNotConfigured(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	server := &Server{mcpGateway: newStubMcpGateway()}
+	router := gin.New()
+	server.registerRoutes(router)
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, MCPOAuthCallbackPath, nil)
+	req.Header.Set("Authorization", "Bearer portico")
+	router.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("未注入回调时该路由应 404，实际 %d", recorder.Code)
+	}
+}
