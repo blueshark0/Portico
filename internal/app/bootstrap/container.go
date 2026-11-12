@@ -31,6 +31,10 @@ import (
 
 const defaultSessionCleanupInterval = 5 * time.Minute
 
+// relayListenAddr 仅监听回环地址：绑定 0.0.0.0 会让同一局域网任意主机免费使用
+// 已配置的付费 API key。端口固定，CLI 配置与 MCP OAuth 回调地址都依赖它。
+const relayListenAddr = "127.0.0.1:18100"
+
 type Container struct {
 	logFile       io.WriteCloser
 	relayServer   *relayhttp.Server
@@ -70,10 +74,18 @@ func Initialize(appVersion string) (*Container, error) {
 	routingService := routingapp.NewService(routinginfra.NewSQLiteStore())
 	// MCP 聚合网关需在 relay 之前构造，经 Options 注入并由 relay 挂载 /mcp。
 	mcpStore := mcpgatewayinfra.NewSQLiteStore()
-	mcpAggregator := mcpgatewayapp.NewAggregator(mcpStore, mcpgatewayapp.AggregatorOptions{AppVersion: appVersion})
-	mcpService := mcpgatewayapp.NewService(mcpStore, mcpAggregator)
-	// 仅监听回环地址：绑定 0.0.0.0 会让同一局域网任意主机免费使用已配置的付费 API key。
-	relayServer := relayhttp.NewServer(routingService, sessionService, "127.0.0.1:18100", relayhttp.Options{
+	// 上游 MCP 服务的 OAuth 回调落在 relay 上：端口固定，注册给授权服务器的
+	// redirect_uri 才能保持稳定。
+	mcpOAuth := mcpgatewayapp.NewOAuthManager(mcpStore, mcpgatewayapp.OAuthManagerOptions{
+		RedirectURL: "http://" + relayListenAddr + relayhttp.MCPOAuthCallbackPath,
+		AppVersion:  appVersion,
+	})
+	mcpAggregator := mcpgatewayapp.NewAggregator(mcpStore, mcpgatewayapp.AggregatorOptions{
+		AppVersion: appVersion,
+		OAuth:      mcpOAuth,
+	})
+	mcpService := mcpgatewayapp.NewService(mcpStore, mcpAggregator, mcpOAuth)
+	relayServer := relayhttp.NewServer(routingService, sessionService, relayListenAddr, relayhttp.Options{
 		SessionCache:   sessioninfra.NewCache(sessionService),
 		RequestLogSink: &observabilityinfra.RequestLogWriter{},
 		TokenParserFor: func(platform kernel.Platform) relayhttp.TokenUsageParser {
@@ -82,7 +94,8 @@ func Initialize(appVersion string) (*Container, error) {
 		RetentionCleanup: func() error {
 			return observabilityinfra.CleanupOldRequestLogs(observabilityinfra.RequestLogRetentionDays)
 		},
-		MCPGateway: mcpAggregator,
+		MCPGateway:       mcpAggregator,
+		MCPOAuthCallback: mcpOAuth.CallbackHandler(),
 	})
 	// 偏好保存（含 configsync 快照恢复）后由 application 层统一推送代理配置到 relay。
 	routingService.RegisterProxyConfigSink(relayServer)

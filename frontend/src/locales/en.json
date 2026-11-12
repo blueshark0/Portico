@@ -226,7 +226,8 @@
         "errors": {
           "name": "Name must start with a letter or digit, contain only letters, digits, - and _ (no consecutive __), max 32 chars",
           "command": "stdio type requires a command",
-          "url": "HTTP type requires a URL"
+          "url": "HTTP type requires a URL",
+          "oauthSecretWithoutId": "A client secret requires a client ID"
         },
         "subtitleStdio": "stdio runs a local command-line process",
         "subtitleHttp": "Configure a remote HTTP endpoint with optional auth",
@@ -235,7 +236,17 @@
         "authCustom": "Custom headers",
         "token": "Access token",
         "argsHint": "Arguments are passed in order; do not paste a whole shell line.",
-        "saveAndTest": "Save & test"
+        "saveAndTest": "Save & test",
+        "authOAuth": "OAuth (sign in with browser)",
+        "oauthHint": "After saving, click \"Authorize\" in the server details and sign in with your browser. Portico stores the tokens and refreshes them automatically.",
+        "oauthAdvanced": "Advanced",
+        "oauthClientName": "Client name (optional)",
+        "oauthClientNameHint": "Name reported when registering with the authorization server; defaults to Portico. Some services only accept allow-listed client names. Entering another client's name impersonates that client, may violate the service's terms and can stop working at any time — use at your own risk.",
+        "oauthClientId": "Client ID (optional)",
+        "oauthClientIdHint": "If the service does not support automatic registration, enter a client you registered with it. Automatic registration is skipped when this is set.",
+        "oauthClientSecret": "Client secret (optional)",
+        "oauthRedirect": "Redirect URL",
+        "oauthRedirectHint": "When registering a client yourself, add this as an allowed redirect URL."
       },
       "confirm": {
         "title": "Delete MCP server",
@@ -255,7 +266,12 @@
         "injectionRemoved": "Injection removed",
         "injectionFailed": "Injection operation failed",
         "copied": "Endpoint copied",
-        "copyFailed": "Copy failed"
+        "copyFailed": "Copy failed",
+        "needsAuth": "Saved. This server needs authorization — click \"Authorize\" in the server details",
+        "oauthStarted": "Authorization page opened in your browser; the server connects once you sign in",
+        "oauthStartFailed": "Failed to start authorization",
+        "oauthCleared": "Authorization cleared",
+        "oauthClearFailed": "Failed to clear authorization"
       }
     },
     "logs": {
@@ -899,7 +915,11 @@
       "edit": "Edit",
       "test": "Test connection",
       "testing": "Testing…",
-      "openDiagnostics": "Open MCP diagnostics & tools"
+      "openDiagnostics": "Open MCP diagnostics & tools",
+      "authorize": "Authorize",
+      "authorizing": "Starting…",
+      "reauthorize": "Re-authorize",
+      "clearAuth": "Clear authorization"
     },
     "cli": {
       "title": "CLI integration",
@@ -918,7 +938,8 @@
       "connected": "Healthy",
       "connecting": "Connecting",
       "failed": "Failed",
-      "disabled": "Disabled"
+      "disabled": "Disabled",
+      "needsAuth": "Needs authorization"
     },
     "localProcess": "local process",
     "remoteService": "remote service",
@@ -938,7 +959,13 @@
       "lastError": "Last error",
       "toolsTitle": "Tool inventory",
       "toolsEmpty": "No tools discovered yet",
-      "toolsMore": "… {count} more on the diagnostics page"
+      "toolsMore": "… {count} more on the diagnostics page",
+      "auth": "Authentication",
+      "oauthNeeded": "OAuth · not authorized",
+      "oauthAuthorized": "OAuth · authorized",
+      "oauthOther": "OAuth",
+      "oauthPending": "Browser did not open?",
+      "oauthCopyLink": "Copy authorization link"
     },
     "delete": {
       "title": "Delete MCP server",
@@ -948,7 +975,10 @@
     "messages": {
       "testOk": "Connected, {count} tools discovered ({ms}ms)",
       "testErr": "Connection failed: {error}",
-      "testFailed": "Connection test failed"
+      "testFailed": "Connection test failed",
+      "needsAuth": "This server needs authorization — click \"Authorize\" first",
+      "linkCopied": "Authorization link copied",
+      "copyFailed": "Copy failed"
     }
   },
   "mcpDiag": {
@@ -1069,7 +1099,8 @@
       "connected": "Connected",
       "connecting": "Connecting",
       "failed": "Failed",
-      "disabled": "Disabled"
+      "disabled": "Disabled",
+      "needsAuth": "Needs authorization"
     },
     "messages": {
       "loadFailed": "Failed to load diagnostics",
@@ -1077,7 +1108,8 @@
       "copyFailed": "Copy failed",
       "rediagnosed": "Diagnostics refreshed",
       "testErr": "Connection failed: {error}",
-      "testFailed": "Connection test failed"
+      "testFailed": "Connection test failed",
+      "needsAuth": "This server needs authorization — complete it on the MCP page"
     }
   },
   "settingsPage": {

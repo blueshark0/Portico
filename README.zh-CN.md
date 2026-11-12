@@ -163,12 +163,15 @@ Portico 还能把你的 MCP server 聚合成一个 Streamable HTTP 端点，让�
 | **端点** | `http://127.0.0.1:18100/mcp`（POST / GET / DELETE） |
 | **鉴权** | `Authorization: Bearer portico` |
 | **上游类型** | `stdio`（命令、参数、环境变量）或 `http`（Streamable HTTP 地址、请求头） |
+| **上游认证** | 无、Bearer 令牌、自定义请求头，或 OAuth（浏览器登录），适用于遵循 MCP 授权规范的远程服务 |
 | **工具命名** | `<server>__<tool>`，例如 `context7__resolve-library-id`；超过 64 字符自动追加哈希后缀 |
 | **安全** | 上游请求头只发往配置中指定的主机，重定向无法带走凭证；server 名称不允许包含 `__`。 |
 
 1. 在「MCP 服务」页添加 server，测试连接并启用。
 2. 打开 **Claude Code** 与 **Codex** 的 CLI 注入开关；只改动 `portico` 这一条目，你自己的 MCP 配置不受影响。重启对应 CLI 生效。
 3. 通过「网关诊断」查看上游健康度、延迟、工具 Schema 与下游命名。
+
+**需要登录的上游（OAuth）。** 远程服务要求登录时，认证方式选择 **OAuth**，保存后在服务详情里点击 **授权**。Portico 会发现授权服务器、把自己注册为客户端、打开浏览器，并把换得的令牌保存在 `app.db` 中、按需自动刷新。回调地址是 `http://127.0.0.1:18100/mcp/oauth/callback`，因此登录必须在本机的浏览器里完成。在 **高级选项** 中可以修改注册时使用的客户端名称，或为不支持自动注册的服务填写预先注册的 Client ID（及 Secret）。只接受白名单客户端的服务会拒绝注册。
 
 其他支持 Streamable HTTP 的 MCP 客户端，可使用上面的端点与 bearer 头手动接入。已启用的上游及其工具会即时对下游可见，上游的 `tools/list_changed` 通知会刷新注册表，无需重连。
 
@@ -178,7 +181,7 @@ Portico 还能把你的 MCP server 聚合成一个 Streamable HTTP 端点，让�
 
 | 路径 | 内容 |
 | --- | --- |
-| `app.db` | 供应商档案与 API key、偏好设置、WebDAV 设置、MCP server |
+| `app.db` | 供应商档案与 API key、偏好设置、WebDAV 设置、MCP server 及其 OAuth 令牌 |
 | `request_log.db` | 逐请求用量记录，保留 **30 天** |
 | `session.db` | 会话 → 供应商绑定 |
 | `hotkeys.db` | 快捷键设置 |
